@@ -1,5 +1,5 @@
 import type { Diagnostic } from "../model/diagnostics.js";
-import type { BridgeClient, BridgeResponse } from "./bridge-client.js";
+import type { BridgeClient } from "./bridge-client.js";
 
 export type JMeterValidationMode = "load" | "loadSave" | "loadSaveReload";
 
@@ -18,11 +18,7 @@ export async function validateWithJMeter(
   bridge: BridgeClient,
   request: JMeterValidationRequest
 ): Promise<JMeterValidationResult> {
-  const response: BridgeResponse<{ valid?: boolean }> = await bridge.request({
-    id: `jmeter-validation:${request.mode}:${request.path}`,
-    command: "validateJmx",
-    payload: request
-  });
+  const response = await bridge.validateJmx(request.path);
 
   return {
     valid: response.success && response.data?.valid === true,

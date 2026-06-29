@@ -2,12 +2,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 
+import type { ComponentCatalog } from "../model/catalog.js";
 import type { Diagnostic } from "../model/diagnostics.js";
 
 export type BridgeRequest = {
   id: string;
   command: string;
-  payload?: unknown;
+  [key: string]: unknown;
 };
 
 export type BridgeResponse<T = unknown> = {
@@ -15,6 +16,18 @@ export type BridgeResponse<T = unknown> = {
   success: boolean;
   data?: T;
   diagnostics: Diagnostic[];
+};
+
+export type BridgeEnvironment = {
+  javaVersion?: string;
+  jmeterHome?: string;
+  jmeterConfigured?: boolean;
+};
+
+export type BridgeJmxResult = {
+  path: string;
+  valid?: boolean;
+  reason?: string;
 };
 
 export type BridgeClientOptions = {
@@ -57,6 +70,30 @@ export class BridgeClient {
 
   async ping(): Promise<BridgeResponse<{ pong: boolean }>> {
     return await this.request({ id: randomUUID(), command: "ping" });
+  }
+
+  async environment(): Promise<BridgeResponse<BridgeEnvironment>> {
+    return await this.request({ id: randomUUID(), command: "environment" });
+  }
+
+  async componentCatalog(): Promise<BridgeResponse<ComponentCatalog>> {
+    return await this.request({ id: randomUUID(), command: "componentCatalog" });
+  }
+
+  async loadJmx(path: string): Promise<BridgeResponse<BridgeJmxResult>> {
+    return await this.request({ id: randomUUID(), command: "loadJmx", path });
+  }
+
+  async saveJmx(path: string): Promise<BridgeResponse<BridgeJmxResult>> {
+    return await this.request({ id: randomUUID(), command: "saveJmx", path });
+  }
+
+  async validateJmx(path: string): Promise<BridgeResponse<BridgeJmxResult>> {
+    return await this.request({ id: randomUUID(), command: "validateJmx", path });
+  }
+
+  async roundTripJmx(path: string): Promise<BridgeResponse<BridgeJmxResult>> {
+    return await this.request({ id: randomUUID(), command: "roundTripJmx", path });
   }
 
   close(): void {
