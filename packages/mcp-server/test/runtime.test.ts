@@ -25,7 +25,7 @@ describe("JmxplsRuntime", () => {
     const tree = await runtime.callTool("list_tree", { planId });
     const nodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
     const raw = await runtime.callTool("get_raw_element", { planId, nodeId });
-    expect((raw.data as { rawRef: string }).rawRef).toContain("raw://");
+    expect((raw.data as { rawRef: string }).rawRef).toContain("jmxpls://raw/");
     const rawProperties = await runtime.callTool("get_raw_properties", { planId, nodeId });
     expect(rawProperties.success).toBe(true);
     const rawTemplate = await runtime.callTool("generate_raw_template", { nodeType: "kg.apc.CustomElement", guiClass: "CustomGui" });

@@ -45,6 +45,18 @@ Example:
 {"name":"check_sla","arguments":{"jtlPath":"results.jtl","maxErrorRate":0.01,"maxP95Ms":750}}
 ```
 
-## Raw and Catalog Tools
+## Raw Tools
 
-Raw tools are reserved for unknown/plugin nodes and explicit low-level inspection. Catalog tools load, refresh, inspect, import, and export component descriptors for typed or plugin-aware workflows.
+Raw tools are reserved for unknown/plugin nodes and low-level recovery work. Prefer typed tools when a known component adapter exists.
+
+- `get_raw_element` returns the semantic node plus its `rawRef` and field map.
+- `get_raw_properties` returns only the raw field map for a node.
+- `add_raw_element` forwards to `add_node` with caller-provided `nodeType` and `fields`.
+- `update_raw_property` forwards to `update_node_field`; use `dryRun: true` first for risky edits.
+- `replace_raw_element` applies a field-by-field semantic patch from a provided `fields` object.
+- `validate_raw_patch` checks raw patch shape before applying it.
+- `generate_raw_template` creates a starter field object for plugin/custom elements.
+
+## Catalog Tools
+
+Catalog tools load, refresh, inspect, import, and export component descriptors for typed or plugin-aware workflows. Use `inspect_component_schema`, `list_component_types`, and `get_component_defaults` before adding unfamiliar components.
