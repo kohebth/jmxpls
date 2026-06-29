@@ -5,7 +5,7 @@ export type InputValidationResult = {
   errors: string[];
 };
 
-type FieldType = "string" | "boolean" | "integer" | "object" | "array";
+type FieldType = "string" | "boolean" | "integer" | "object" | "array" | "stringOrNumber";
 
 type FieldRule = {
   name: string;
@@ -21,6 +21,20 @@ type ToolInputRule = {
 
 const PLAN_ID: FieldRule = { name: "planId", type: "string" };
 const NODE_ID: FieldRule = { name: "nodeId", type: "string" };
+const PARENT_ID_ALIASES: FieldRule[] = [{ name: "parentNodeId", type: "string" }, { name: "parentId", type: "string" }];
+const NODE_TYPE_ALIASES: FieldRule[] = [{ name: "nodeType", type: "string" }, { name: "type", type: "string" }];
+const PARENT_OPTIONALS: FieldRule[] = PARENT_ID_ALIASES;
+const PATCH_OPTIONALS: FieldRule[] = [{ name: "dryRun", type: "boolean" }, { name: "validate", type: "boolean" }];
+const HTTP_TARGET_OPTIONALS: FieldRule[] = [
+  { name: "name", type: "string" },
+  { name: "protocol", type: "string" },
+  { name: "domain", type: "string" },
+  { name: "port", type: "stringOrNumber" },
+  { name: "path", type: "string" },
+  { name: "enabled", type: "boolean" },
+  { name: "index", type: "integer" },
+  ...PATCH_OPTIONALS
+];
 
 const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   open_plan: { required: [{ name: "path", type: "string" }] },
@@ -68,85 +82,57 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   },
   validate_plan_language: { required: [{ name: "text", type: "string" }] },
   roundtrip_plan_language: { required: [PLAN_ID] },
-  explain_plan_language: {
-    requiredOneOf: [[PLAN_ID, { name: "text", type: "string" }]]
-  },
-  compare_plan_language: {
-    required: [
-      { name: "left", type: "string" },
-      { name: "right", type: "string" }
-    ]
-  },
+  explain_plan_language: { requiredOneOf: [[PLAN_ID, { name: "text", type: "string" }]] },
+  compare_plan_language: { required: [{ name: "left", type: "string" }, { name: "right", type: "string" }] },
   validate_plan: { required: [PLAN_ID] },
   add_node: {
     required: [PLAN_ID],
-    requiredOneOf: [
-      [{ name: "parentNodeId", type: "string" }, { name: "parentId", type: "string" }],
-      [{ name: "nodeType", type: "string" }, { name: "type", type: "string" }]
-    ],
-    optional: [
-      { name: "nodeType", type: "string" },
-      { name: "type", type: "string" },
-      { name: "fields", type: "object" },
-      { name: "index", type: "integer" },
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
+    requiredOneOf: [PARENT_ID_ALIASES, NODE_TYPE_ALIASES],
+    optional: [...NODE_TYPE_ALIASES, { name: "fields", type: "object" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS]
   },
   update_node_field: {
     required: [PLAN_ID, NODE_ID],
     requiredOneOf: [[{ name: "fieldPath", type: "string" }, { name: "field", type: "string" }]],
-    optional: [
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
+    optional: PATCH_OPTIONALS
   },
-  delete_node: {
-    required: [PLAN_ID, NODE_ID],
-    optional: [
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
-  },
+  delete_node: { required: [PLAN_ID, NODE_ID], optional: PATCH_OPTIONALS },
   move_node: {
     required: [PLAN_ID, NODE_ID],
-    requiredOneOf: [[{ name: "toParentNodeId", type: "string" }, { name: "parentNodeId", type: "string" }, { name: "parentId", type: "string" }]],
-    optional: [
-      { name: "index", type: "integer" },
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
+    requiredOneOf: [[{ name: "toParentNodeId", type: "string" }, ...PARENT_ID_ALIASES]],
+    optional: [{ name: "index", type: "integer" }, ...PATCH_OPTIONALS]
   },
   clone_node: {
     required: [PLAN_ID, NODE_ID],
-    requiredOneOf: [[{ name: "toParentNodeId", type: "string" }, { name: "parentNodeId", type: "string" }, { name: "parentId", type: "string" }]],
-    optional: [
-      { name: "index", type: "integer" },
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
+    requiredOneOf: [[{ name: "toParentNodeId", type: "string" }, ...PARENT_ID_ALIASES]],
+    optional: [{ name: "index", type: "integer" }, ...PATCH_OPTIONALS]
   },
   enable_node: { required: [PLAN_ID, NODE_ID] },
   disable_node: { required: [PLAN_ID, NODE_ID] },
   apply_semantic_patch: {
     required: [PLAN_ID],
     requiredOneOf: [[{ name: "patch", type: "object" }, { name: "operations", type: "array" }]],
-    optional: [
-      { name: "dryRun", type: "boolean" },
-      { name: "validate", type: "boolean" }
-    ]
+    optional: PATCH_OPTIONALS
   },
-  save_plan: {
+  add_http_request: {
     required: [PLAN_ID],
-    optional: [
-      { name: "path", type: "string" },
-      { name: "backup", type: "boolean" }
-    ]
+    requiredOneOf: [PARENT_ID_ALIASES],
+    optional: [...PARENT_OPTIONALS, ...HTTP_TARGET_OPTIONALS, { name: "method", type: "string" }, { name: "body", type: "string" }, { name: "headers", type: "object" }]
   },
-  save_plan_as: {
-    required: [PLAN_ID, { name: "path", type: "string" }],
-    optional: [{ name: "backup", type: "boolean" }]
-  }
+  add_http_defaults: {
+    required: [PLAN_ID],
+    requiredOneOf: [PARENT_ID_ALIASES],
+    optional: [...PARENT_OPTIONALS, ...HTTP_TARGET_OPTIONALS]
+  },
+  add_header_manager: {
+    required: [PLAN_ID],
+    requiredOneOf: [PARENT_ID_ALIASES],
+    optional: [...PARENT_OPTIONALS, { name: "name", type: "string" }, { name: "headers", type: "object" }, { name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS]
+  },
+  add_cookie_manager: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...PARENT_OPTIONALS, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS] },
+  add_cache_manager: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...PARENT_OPTIONALS, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS] },
+  add_auth_manager: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...PARENT_OPTIONALS, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS] },
+  save_plan: { required: [PLAN_ID], optional: [{ name: "path", type: "string" }, { name: "backup", type: "boolean" }] },
+  save_plan_as: { required: [PLAN_ID, { name: "path", type: "string" }], optional: [{ name: "backup", type: "boolean" }] }
 };
 
 export function validateToolInput(toolName: string, input: ToolCallInput): InputValidationResult {
@@ -201,6 +187,9 @@ function validateField(value: unknown, field: FieldRule): string | undefined {
       return `must be one of ${field.enum.join(", ")}`;
     }
     return undefined;
+  }
+  if (field.type === "stringOrNumber") {
+    return (typeof value === "string" && value.length > 0) || typeof value === "number" ? undefined : "must be a string or number";
   }
   if (field.type === "boolean") {
     return typeof value === "boolean" ? undefined : "must be a boolean";
