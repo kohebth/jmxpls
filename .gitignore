@@ -1,0 +1,22 @@
+node_modules/
+.pnpm-store/
+
+# TypeScript build output
+packages/*/dist/
+coverage/
+
+# Gradle build output
+.gradle/
+packages/java-bridge/.gradle/
+packages/java-bridge/build/
+
+# Logs and local environment
+*.log
+.env
+.env.*
+!.env.example
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/

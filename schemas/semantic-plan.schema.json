@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/semantic-plan.schema.json",
+  "title": "SemanticPlan",
+  "type": "object",
+  "required": ["name", "root", "indexes", "warnings"],
+  "additionalProperties": false,
+  "properties": {
+    "planId": { "type": "string" },
+    "name": { "type": "string" },
+    "root": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "indexes": { "type": "object" },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["nodeId", "path", "role", "type", "name", "enabled", "fields", "children", "rawRef"],
+      "properties": {
+        "nodeId": { "type": "string" },
+        "parentNodeId": { "type": "string" },
+        "path": { "type": "string" },
+        "role": { "type": "string" },
+        "type": { "type": "string" },
+        "name": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "fields": { "type": "object" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "rawRef": { "type": "string" }
+      }
+    }
+  }
+}

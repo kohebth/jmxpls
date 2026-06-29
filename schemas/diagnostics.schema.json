@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/diagnostics.schema.json",
+  "title": "Diagnostic",
+  "type": "object",
+  "required": ["code", "severity", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "code": { "type": "string", "minLength": 1 },
+    "severity": { "type": "string", "enum": ["info", "warning", "error", "fatal"] },
+    "message": { "type": "string", "minLength": 1 },
+    "nodeId": { "type": "string" },
+    "jmxPath": { "type": "string" },
+    "sourceRange": {
+      "type": "object",
+      "required": ["startLine", "startColumn", "endLine", "endColumn"],
+      "additionalProperties": false,
+      "properties": {
+        "startLine": { "type": "integer", "minimum": 1 },
+        "startColumn": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 },
+        "endColumn": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fixSuggestion": { "type": "string" }
+  }
+}

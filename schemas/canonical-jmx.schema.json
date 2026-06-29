@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/canonical-jmx.schema.json",
+  "title": "CanonicalJmxDocument",
+  "type": "object",
+  "required": ["diagnostics"],
+  "additionalProperties": true,
+  "properties": {
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "diagnostics.schema.json" }
+    },
+    "root": {
+      "type": "object",
+      "required": ["kind", "element"],
+      "properties": {
+        "kind": { "const": "jmxRoot" },
+        "hashTree": { "$ref": "#/$defs/hashTree" }
+      }
+    }
+  },
+  "$defs": {
+    "hashTree": {
+      "type": "object",
+      "required": ["kind", "path", "pairs"],
+      "properties": {
+        "kind": { "const": "hashTree" },
+        "path": { "type": "string" },
+        "pairs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pair" }
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "required": ["kind", "path", "nodeId", "element", "children"],
+      "properties": {
+        "kind": { "const": "pair" },
+        "path": { "type": "string" },
+        "nodeId": { "type": "string" },
+        "element": { "$ref": "#/$defs/element" },
+        "children": { "$ref": "#/$defs/hashTree" }
+      }
+    },
+    "element": {
+      "type": "object",
+      "required": ["kind", "path", "tagName", "properties"],
+      "properties": {
+        "kind": { "const": "element" },
+        "path": { "type": "string" },
+        "tagName": { "type": "string" },
+        "testClass": { "type": "string" },
+        "guiClass": { "type": "string" },
+        "testName": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "properties": { "type": "array" }
+      }
+    }
+  }
+}

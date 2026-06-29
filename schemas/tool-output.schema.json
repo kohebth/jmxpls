@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/tool-output.schema.json",
+  "title": "ToolOutput",
+  "type": "object",
+  "required": ["success", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "success": { "type": "boolean" },
+    "data": true,
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "diagnostics.schema.json" }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "planId": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "dryRun": { "type": "boolean" },
+        "elapsedMs": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

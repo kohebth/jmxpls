@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <CustomPlugin guiclass="CustomGui" testclass="com.example.CustomPlugin" testname="Plugin" enabled="true">
+      <customProp name="plugin.raw"><nested value="kept"/></customProp>
+    </CustomPlugin>
+    <hashTree/>
+  </hashTree>
+</jmeterTestPlan>

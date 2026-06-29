@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/sidecar.schema.json",
+  "title": "JmxplsSidecar",
+  "type": "object",
+  "required": ["schemaVersion", "sourcePath", "updatedAt", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sourcePath": { "type": "string", "minLength": 1 },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nodeId", "jmxPath", "fingerprint"],
+        "additionalProperties": false,
+        "properties": {
+          "nodeId": { "type": "string", "minLength": 1 },
+          "jmxPath": { "type": "string", "minLength": 1 },
+          "fingerprint": { "type": "string", "minLength": 1 },
+          "testName": { "type": "string" }
+        }
+      }
+    }
+  }
+}

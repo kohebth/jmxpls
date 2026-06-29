@@ -1,0 +1,4 @@
+[mcp_servers.fsmcp]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/home/duync/repo/jmxpls"]
+

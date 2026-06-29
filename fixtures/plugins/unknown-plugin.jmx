@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <com.example.UnknownPlugin guiclass="CustomGui" testclass="com.example.UnknownPlugin" testname="Unknown Plugin" enabled="true">
+      <stringProp name="custom.value">kept</stringProp>
+    </com.example.UnknownPlugin>
+    <hashTree/>
+  </hashTree>
+</jmeterTestPlan>

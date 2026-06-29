@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jmxpls.dev/schemas/plan-language.schema.json",
+  "title": "PlanLanguageDocument",
+  "type": "object",
+  "required": ["format", "version", "mode", "name", "nodes", "warnings"],
+  "properties": {
+    "format": { "const": "jmxpls-plan-language" },
+    "version": { "const": 1 },
+    "mode": { "enum": ["outline", "flow", "semantic", "full"] },
+    "name": { "type": "string" },
+    "nodes": { "type": "array" },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}
