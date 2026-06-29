@@ -2,6 +2,16 @@
 
 The server exposes session, query, Plan Language, mutation, validation, execution, template, and typed component tools. Tools are schema-first and avoid raw XML unless a raw tool is explicitly requested.
 
+## Resources
+
+Resources provide read-only, progressive disclosure views for plans, catalogs, runs, and diffs.
+
+- `jmxpls://plans/{planId}/summary`, `/tree`, `/execution-flow`, `/diagnostics`, and `/plan-language/{mode}` expose opened plan views.
+- `jmxpls://plans/{planId}/diff/semantic` exposes the latest semantic diff after a mutation.
+- `jmxpls://catalog`, `/summary`, `/types`, and `/types/{type}` expose the active component catalog, including imported descriptors.
+- `jmxpls://runs`, `/runs/{runId}`, `/runs/{runId}/logs`, and `/runs/{runId}/artifacts` expose in-memory planned run records.
+- Raw XML and XML diff views are explicit resources only; normal workflows should use semantic or Plan Language resources.
+
 ## Sessions and Queries
 
 - `open_plan` opens a `.jmx` file and returns a `planId`, compact summary, diagnostics, and default resource URI.
