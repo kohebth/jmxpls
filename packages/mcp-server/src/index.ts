@@ -3,7 +3,8 @@
 export * from "./server.js";
 export * from "./prompts/registry.js";
 export * from "./resources/registry.js";
-export * from "./runtime/tool-runtime.js";
+export { JmxplsRuntime } from "./runtime/execution-runtime.js";
+export type { ToolCallInput, ToolCallResult } from "./runtime/tool-runtime.js";
 export * from "./security/audit-log.js";
 export * from "./security/redaction.js";
 export * from "./security/tool-policy.js";

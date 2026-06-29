@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 
 import { createJmxplsServer } from "../server.js";
-import { JmxplsRuntime } from "../runtime/tool-runtime.js";
+import { JmxplsRuntime } from "../runtime/execution-runtime.js";
 
 export type StdioRequest = {
   id?: string | number;
