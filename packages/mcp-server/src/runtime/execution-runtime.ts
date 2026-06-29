@@ -23,6 +23,28 @@ export class JmxplsRuntime extends BaseRuntime {
     return result ?? super.callTool(name, input);
   }
 
+  override readResource(uri: string): ToolCallResult {
+    if (uri === "jmxpls://runs") {
+      return { success: true, data: this.runs.list() };
+    }
+    const match = /^jmxpls:\/\/runs\/([^/]+)(?:\/(logs|artifacts))?$/.exec(uri);
+    if (!match) {
+      return super.readResource(uri);
+    }
+    const [, runId = "", suffix] = match;
+    const run = this.runs.get(runId);
+    if (!run) {
+      return { success: false, error: `Unknown runId: ${runId}` };
+    }
+    if (suffix === "logs") {
+      return { success: true, data: { runId, logs: run.logs } };
+    }
+    if (suffix === "artifacts") {
+      return { success: true, data: { runId, artifacts: run.artifacts } };
+    }
+    return { success: true, data: run };
+  }
+
   private async callExecutionTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
     try {
       switch (name) {
