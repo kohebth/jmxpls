@@ -82,6 +82,11 @@ export class JmxplsRuntime {
         case "add_boundary_extractor": return this.applySingleOperation(input, addBoundaryExtractorOperation(input));
         case "add_xpath_extractor": return this.applySingleOperation(input, addXPathExtractorOperation(input));
         case "add_css_extractor": return this.applySingleOperation(input, addCssExtractorOperation(input));
+        case "add_jsr223_preprocessor": return this.applySingleOperation(input, addJsr223ProcessorOperation(input, "JSR223PreProcessor", "JSR223 PreProcessor"));
+        case "add_jsr223_postprocessor": return this.applySingleOperation(input, addJsr223ProcessorOperation(input, "JSR223PostProcessor", "JSR223 PostProcessor"));
+        case "add_jdbc_preprocessor": return this.applySingleOperation(input, addJdbcPreProcessorOperation(input));
+        case "add_user_parameters": return this.applySingleOperation(input, addUserParametersOperation(input));
+        case "add_url_rewriting_modifier": return this.applySingleOperation(input, addUrlRewritingModifierOperation(input));
         case "add_node": return this.applySingleOperation(input, addNodeOperation(input));
         case "update_node_field": return this.applySingleOperation(input, updateFieldOperation(input));
         case "delete_node": return this.applySingleOperation(input, deleteNodeOperation(input));
@@ -117,123 +122,28 @@ export class JmxplsRuntime {
     return { success: false, error: `Unsupported resource suffix: ${suffix}` };
   }
 
-  private async openPlan(input: ToolCallInput): Promise<ToolCallResult> {
-    const session = await this.sessions.openPlan(requiredString(input, "path"));
-    return { success: true, data: { ...session.summary(), summary: summarizePlan(session.semanticPlan()), defaultResource: `jmxpls://plans/${session.planId}/plan-language/outline` } };
-  }
-
-  private async reloadPlan(input: ToolCallInput): Promise<ToolCallResult> {
-    const planId = requiredString(input, "planId");
-    const existing = this.sessions.get(planId);
-    if (!existing) return { success: false, error: `Unknown planId: ${planId}` };
-    const sourcePath = existing.sourcePath;
-    this.sessions.closePlan(planId);
-    return this.openPlan({ path: sourcePath });
-  }
-
-  private closePlan(input: ToolCallInput): ToolCallResult {
-    const planId = requiredString(input, "planId");
-    return { success: this.sessions.closePlan(planId), data: { planId } };
-  }
-
-  private getNode(input: ToolCallInput): ToolCallResult {
-    return this.withSession(input, (session) => semanticNodes(session).find((node) => node.nodeId === requiredString(input, "nodeId")) ?? null);
-  }
-
-  private findNodes(input: ToolCallInput): ToolCallResult {
-    return this.withSession(input, (session) => {
-      const role = optionalString(input, "role") as SemanticRole | undefined;
-      const type = optionalString(input, "type");
-      const name = optionalString(input, "name");
-      const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined;
-      return semanticNodes(session).filter((node) => (role ? node.role === role : true) && (type ? node.type.includes(type) : true) && (name ? node.name.includes(name) : true) && (enabled === undefined ? true : node.enabled === enabled));
-    });
-  }
-
-  private findByVariable(input: ToolCallInput): ToolCallResult {
-    return this.withSession(input, (session) => semanticNodes(session).filter((node) => new Set(session.semanticPlan().indexes.variables[requiredString(input, "variable")] ?? []).has(node.nodeId)));
-  }
-
-  private findByRequest(input: ToolCallInput): ToolCallResult {
-    return this.withSession(input, (session) => {
-      const method = optionalString(input, "method");
-      const pathContains = optionalString(input, "pathContains") ?? optionalString(input, "path");
-      const domainContains = optionalString(input, "domainContains") ?? optionalString(input, "domain");
-      return semanticNodes(session).filter((node) => {
-        if (node.role !== "sampler") return false;
-        const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`;
-        return (method ? searchable.includes(method) : true) && (pathContains ? searchable.includes(pathContains) : true) && (domainContains ? searchable.includes(domainContains) : true);
-      });
-    });
-  }
-
-  private getPlanLanguage(input: ToolCallInput): ToolCallResult {
-    return this.withSession(input, (session) => {
-      const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode;
-      const format = optionalString(input, "format") ?? "object";
-      const document = projectPlanLanguage(session.semanticPlan(), { mode });
-      return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document;
-    });
-  }
-
-  private validatePlanLanguage(input: ToolCallInput): ToolCallResult {
-    const parsed = parsePlanLanguage(requiredString(input, "text"));
-    return { success: true, data: { valid: parsed.document.format === "jmxpls-plan-language", sourceFormat: parsed.sourceFormat } };
-  }
-
-  private explainPlanLanguage(input: ToolCallInput): ToolCallResult {
-    const text = optionalString(input, "text");
-    if (text) return { success: true, data: summarizePlanLanguage(parsePlanLanguage(text).document.nodes) };
-    return this.withSession(input, (session) => summarizePlanLanguage(projectPlanLanguage(session.semanticPlan()).nodes));
-  }
-
-  private comparePlanLanguage(input: ToolCallInput): ToolCallResult {
-    const left = parsePlanLanguage(requiredString(input, "left"));
-    const right = parsePlanLanguage(requiredString(input, "right"));
-    return { success: true, data: { equivalent: JSON.stringify(left.document) === JSON.stringify(right.document), left: summarizePlanLanguage(left.document.nodes), right: summarizePlanLanguage(right.document.nodes) } };
-  }
-
-  private convertHardcodedHostToVariable(input: ToolCallInput): ToolCallResult {
-    const host = requiredString(input, "host");
-    const variableName = requiredString(input, "variableName");
-    return this.withSession(input, (session) => {
-      const operations: SemanticPatchOperation[] = semanticNodes(session)
-        .filter((node) => node.role === "sampler" && node.fields.domain === host)
-        .map((node) => ({ op: "updateField", nodeId: node.nodeId, fieldPath: "HTTPSampler.domain", value: `\${${variableName}}` }));
-      if (operations.length === 0) throw new Error(`No HTTP sampler domain matched ${host}`);
-      return session.applyPatch(patchWithFlags(input, operations));
-    });
-  }
-
-  private applySingleOperation(input: ToolCallInput, operation: SemanticPatchOperation): ToolCallResult {
-    return this.applySemanticPatch({ ...input, patch: patchWithFlags(input, [operation]) });
-  }
-
-  private applySemanticPatch(input: ToolCallInput): ToolCallResult {
-    const planId = requiredString(input, "planId");
-    const patch = semanticPatchFromInput(input);
-    const session = this.sessions.get(planId);
-    if (!session) return { success: false, error: `Unknown planId: ${planId}` };
-    return { success: true, data: session.applyPatch(patch) };
-  }
-
-  private async savePlan(input: ToolCallInput): Promise<ToolCallResult> {
-    const planId = requiredString(input, "planId");
-    const session = this.sessions.get(planId);
-    if (!session) return { success: false, error: `Unknown planId: ${planId}` };
-    return { success: true, data: await session.save(optionalString(input, "path"), input.backup !== false) };
-  }
-
-  private withSession(input: ToolCallInput, fn: (session: PlanSession) => unknown): ToolCallResult {
-    const session = this.sessions.get(requiredString(input, "planId"));
-    if (!session) return { success: false, error: `Unknown planId: ${String(input.planId)}` };
-    return { success: true, data: fn(session) };
-  }
+  private async openPlan(input: ToolCallInput): Promise<ToolCallResult> { const session = await this.sessions.openPlan(requiredString(input, "path")); return { success: true, data: { ...session.summary(), summary: summarizePlan(session.semanticPlan()), defaultResource: `jmxpls://plans/${session.planId}/plan-language/outline` } }; }
+  private async reloadPlan(input: ToolCallInput): Promise<ToolCallResult> { const planId = requiredString(input, "planId"); const existing = this.sessions.get(planId); if (!existing) return { success: false, error: `Unknown planId: ${planId}` }; const sourcePath = existing.sourcePath; this.sessions.closePlan(planId); return this.openPlan({ path: sourcePath }); }
+  private closePlan(input: ToolCallInput): ToolCallResult { const planId = requiredString(input, "planId"); return { success: this.sessions.closePlan(planId), data: { planId } }; }
+  private getNode(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).find((node) => node.nodeId === requiredString(input, "nodeId")) ?? null); }
+  private findNodes(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const role = optionalString(input, "role") as SemanticRole | undefined; const type = optionalString(input, "type"); const name = optionalString(input, "name"); const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined; return semanticNodes(session).filter((node) => (role ? node.role === role : true) && (type ? node.type.includes(type) : true) && (name ? node.name.includes(name) : true) && (enabled === undefined ? true : node.enabled === enabled)); }); }
+  private findByVariable(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).filter((node) => new Set(session.semanticPlan().indexes.variables[requiredString(input, "variable")] ?? []).has(node.nodeId))); }
+  private findByRequest(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const method = optionalString(input, "method"); const pathContains = optionalString(input, "pathContains") ?? optionalString(input, "path"); const domainContains = optionalString(input, "domainContains") ?? optionalString(input, "domain"); return semanticNodes(session).filter((node) => { if (node.role !== "sampler") return false; const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`; return (method ? searchable.includes(method) : true) && (pathContains ? searchable.includes(pathContains) : true) && (domainContains ? searchable.includes(domainContains) : true); }); }); }
+  private getPlanLanguage(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode; const format = optionalString(input, "format") ?? "object"; const document = projectPlanLanguage(session.semanticPlan(), { mode }); return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document; }); }
+  private validatePlanLanguage(input: ToolCallInput): ToolCallResult { const parsed = parsePlanLanguage(requiredString(input, "text")); return { success: true, data: { valid: parsed.document.format === "jmxpls-plan-language", sourceFormat: parsed.sourceFormat } }; }
+  private explainPlanLanguage(input: ToolCallInput): ToolCallResult { const text = optionalString(input, "text"); if (text) return { success: true, data: summarizePlanLanguage(parsePlanLanguage(text).document.nodes) }; return this.withSession(input, (session) => summarizePlanLanguage(projectPlanLanguage(session.semanticPlan()).nodes)); }
+  private comparePlanLanguage(input: ToolCallInput): ToolCallResult { const left = parsePlanLanguage(requiredString(input, "left")); const right = parsePlanLanguage(requiredString(input, "right")); return { success: true, data: { equivalent: JSON.stringify(left.document) === JSON.stringify(right.document), left: summarizePlanLanguage(left.document.nodes), right: summarizePlanLanguage(right.document.nodes) } }; }
+  private convertHardcodedHostToVariable(input: ToolCallInput): ToolCallResult { const host = requiredString(input, "host"); const variableName = requiredString(input, "variableName"); return this.withSession(input, (session) => { const operations: SemanticPatchOperation[] = semanticNodes(session).filter((node) => node.role === "sampler" && node.fields.domain === host).map((node) => ({ op: "updateField", nodeId: node.nodeId, fieldPath: "HTTPSampler.domain", value: `\${${variableName}}` })); if (operations.length === 0) throw new Error(`No HTTP sampler domain matched ${host}`); return session.applyPatch(patchWithFlags(input, operations)); }); }
+  private applySingleOperation(input: ToolCallInput, operation: SemanticPatchOperation): ToolCallResult { return this.applySemanticPatch({ ...input, patch: patchWithFlags(input, [operation]) }); }
+  private applySemanticPatch(input: ToolCallInput): ToolCallResult { const planId = requiredString(input, "planId"); const patch = semanticPatchFromInput(input); const session = this.sessions.get(planId); if (!session) return { success: false, error: `Unknown planId: ${planId}` }; return { success: true, data: session.applyPatch(patch) }; }
+  private async savePlan(input: ToolCallInput): Promise<ToolCallResult> { const planId = requiredString(input, "planId"); const session = this.sessions.get(planId); if (!session) return { success: false, error: `Unknown planId: ${planId}` }; return { success: true, data: await session.save(optionalString(input, "path"), input.backup !== false) }; }
+  private withSession(input: ToolCallInput, fn: (session: PlanSession) => unknown): ToolCallResult { const session = this.sessions.get(requiredString(input, "planId")); if (!session) return { success: false, error: `Unknown planId: ${String(input.planId)}` }; return { success: true, data: fn(session) }; }
 }
 
 function semanticNodes(session: PlanSession): SemanticNode[] { return flattenSemanticNodes(session.semanticPlan().root); }
 function semanticPatchFromInput(input: ToolCallInput): SemanticPatch { const patch = input.patch as SemanticPatch | undefined; if (patch && Array.isArray(patch.operations)) return patch; if (Array.isArray(input.operations)) return patchWithFlags(input, input.operations as SemanticPatchOperation[]); throw new Error("patch.operations is required"); }
 function patchWithFlags(input: ToolCallInput, operations: SemanticPatchOperation[]): SemanticPatch { return { operations, ...(typeof input.dryRun === "boolean" ? { dryRun: input.dryRun } : {}), ...(typeof input.validate === "boolean" ? { validate: input.validate } : {}) }; }
+function typedAddOperation(input: ToolCallInput, nodeType: string, guiClass: string, fields: Record<string, unknown>): SemanticPatchOperation { const parentNodeId = optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "parentNodeId"); const index = optionalNumber(input, "index"); return { op: "addNode", parentNodeId, nodeType, fields: { ...fields, guiClass }, ...(index !== undefined ? { index } : {}) }; }
 
 function addHttpRequestOperation(input: ToolCallInput): SemanticPatchOperation { const method = optionalString(input, "method") ?? "GET"; const path = optionalString(input, "path") ?? "/"; const fields = httpTargetFields(input, `${method} ${path}`); fields["HTTPSampler.method"] = method; fields["HTTPSampler.path"] = path; setIfPresent(fields, "HTTPSampler.postBodyRaw", optionalString(input, "body")); if (isObject(input.headers)) fields["jmxpls.headers"] = jsonField(input.headers); return typedAddOperation(input, "HTTPSamplerProxy", "HttpTestSampleGui", fields); }
 function addHttpDefaultsOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "ConfigTestElement", "HttpDefaultsGui", httpTargetFields(input, "HTTP Request Defaults")); }
@@ -243,43 +153,42 @@ function addCsvDataSetOperation(input: ToolCallInput): SemanticPatchOperation { 
 function addCounterOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "CounterConfig", "CounterConfigGui", compactFields({ name: optionalString(input, "name") ?? "Counter", enabled: optionalBoolean(input, "enabled") ?? true, "CounterConfig.name": requiredString(input, "variableName"), "CounterConfig.start": optionalScalar(input, "start") ?? 1, "CounterConfig.end": optionalScalar(input, "end"), "CounterConfig.incr": optionalScalar(input, "increment") ?? 1, "CounterConfig.format": optionalString(input, "format"), "CounterConfig.per_user": optionalBoolean(input, "perUser"), "CounterConfig.reset_on_tg_iteration": optionalBoolean(input, "resetOnThreadGroupIteration") })); }
 function addRandomVariableOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "RandomVariableConfig", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Random Variable", enabled: optionalBoolean(input, "enabled") ?? true, variableName: requiredString(input, "variableName"), minimumValue: optionalScalar(input, "minimumValue") ?? 1, maximumValue: optionalScalar(input, "maximumValue") ?? 100, outputFormat: optionalString(input, "outputFormat"), perThread: optionalBoolean(input, "perThread") })); }
 function addJdbcDataSourceOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JDBCDataSource", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JDBC Connection Configuration", enabled: optionalBoolean(input, "enabled") ?? true, dataSource: requiredString(input, "dataSource"), dbUrl: optionalString(input, "dbUrl"), driver: optionalString(input, "driver"), username: optionalString(input, "username"), password: optionalString(input, "password") })); }
-
-function addJdbcSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JDBCSampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JDBC Request", enabled: optionalBoolean(input, "enabled") ?? true, dataSource: requiredString(input, "dataSource"), query: requiredString(input, "query"), queryType: optionalString(input, "queryType") ?? "Select Statement", queryArguments: optionalString(input, "parameters"), variableNames: Array.isArray(input.variableNames) ? input.variableNames.join(",") : undefined, resultVariable: optionalString(input, "resultVariable") })); }
+function addJdbcSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JDBCSampler", "TestBeanGUI", jdbcFields(input, "JDBC Request")); }
 function addFtpSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "FTPSampler", "FtpTestSamplerGui", compactFields({ name: optionalString(input, "name") ?? "FTP Request", enabled: optionalBoolean(input, "enabled") ?? true, "FTPSampler.server": requiredString(input, "server"), "FTPSampler.remoteFile": requiredString(input, "remoteFile"), "FTPSampler.localFile": optionalString(input, "localFile"), "FTPSampler.action": optionalString(input, "action") ?? "get", "FTPSampler.binaryMode": optionalBoolean(input, "binaryMode") })); }
 function addTcpSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "TCPSampler", "TCPSamplerGui", compactFields({ name: optionalString(input, "name") ?? "TCP Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "TCPSampler.server": requiredString(input, "server"), "TCPSampler.port": optionalScalar(input, "port"), "TCPSampler.text": optionalString(input, "text"), "TCPSampler.classname": optionalString(input, "classname"), "TCPSampler.timeout": optionalScalar(input, "timeout") })); }
 function addJmsSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JMSSampler", "JmsSamplerGui", compactFields({ name: optionalString(input, "name") ?? "JMS Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "JMSSampler.destination": requiredString(input, "destination"), "JMSSampler.message": optionalString(input, "message"), "JMSSampler.providerUrl": optionalString(input, "providerUrl") })); }
 function addSmtpSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "SmtpSampler", "SmtpSamplerGui", compactFields({ name: optionalString(input, "name") ?? "SMTP Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "SMTPSampler.server": requiredString(input, "server"), "SMTPSampler.receiver": requiredString(input, "recipient"), "SMTPSampler.sender": optionalString(input, "sender"), "SMTPSampler.subject": optionalString(input, "subject"), "SMTPSampler.message": optionalString(input, "body") })); }
-function addJsr223SamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Sampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Sampler", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters") })); }
+function addJsr223SamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Sampler", "TestBeanGUI", jsr223Fields(input, "JSR223 Sampler")); }
 function addDebugSamplerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "DebugSampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Debug Sampler", enabled: optionalBoolean(input, "enabled") ?? true, displayJMeterVariables: optionalBoolean(input, "displayJMeterVariables") ?? true, displayJMeterProperties: optionalBoolean(input, "displayJMeterProperties") ?? false, displaySystemProperties: optionalBoolean(input, "displaySystemProperties") ?? false })); }
-
 function addConstantTimerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "ConstantTimer", "ConstantTimerGui", compactFields({ name: optionalString(input, "name") ?? "Constant Timer", enabled: optionalBoolean(input, "enabled") ?? true, "ConstantTimer.delay": optionalScalar(input, "delayMs") ?? 300 })); }
 function addRandomTimerOperation(input: ToolCallInput): SemanticPatchOperation { const distribution = optionalString(input, "distribution") ?? "uniform"; const timer = distribution === "gaussian" ? { type: "GaussianRandomTimer", gui: "GaussianRandomTimerGui", name: "Gaussian Random Timer" } : distribution === "poisson" ? { type: "PoissonRandomTimer", gui: "PoissonRandomTimerGui", name: "Poisson Random Timer" } : { type: "UniformRandomTimer", gui: "UniformRandomTimerGui", name: "Uniform Random Timer" }; return typedAddOperation(input, timer.type, timer.gui, compactFields({ name: optionalString(input, "name") ?? timer.name, enabled: optionalBoolean(input, "enabled") ?? true, "ConstantTimer.delay": optionalScalar(input, "delayMs") ?? 300, "RandomTimer.range": optionalScalar(input, "rangeMs"), "RandomTimer.deviation": optionalScalar(input, "deviationMs"), "RandomTimer.lambda": optionalScalar(input, "lambdaMs") })); }
 function addSyncTimerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "SyncTimer", "SyncTimerGui", compactFields({ name: optionalString(input, "name") ?? "Synchronizing Timer", enabled: optionalBoolean(input, "enabled") ?? true, groupSize: optionalScalar(input, "groupSize"), timeoutInMs: optionalScalar(input, "timeoutMs") ?? 0 })); }
 function addThroughputTimerOperation(input: ToolCallInput): SemanticPatchOperation { if (optionalBoolean(input, "precise") === true) return typedAddOperation(input, "PreciseThroughputTimer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Precise Throughput Timer", enabled: optionalBoolean(input, "enabled") ?? true, throughput: optionalScalar(input, "targetThroughput"), throughputPeriod: optionalScalar(input, "throughputPeriod") ?? 60, duration: optionalScalar(input, "durationSeconds"), batchSize: optionalScalar(input, "batchSize"), batchThreadDelay: optionalScalar(input, "batchThreadDelay") })); return typedAddOperation(input, "ConstantThroughputTimer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Constant Throughput Timer", enabled: optionalBoolean(input, "enabled") ?? true, throughput: optionalScalar(input, "targetThroughput"), calcMode: optionalScalar(input, "calcMode") ?? 1 })); }
-function addJsr223TimerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Timer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Timer", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters"), cacheKey: optionalString(input, "cacheKey") })); }
-
+function addJsr223TimerOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Timer", "TestBeanGUI", jsr223Fields(input, "JSR223 Timer")); }
 function addResponseAssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "ResponseAssertion", "AssertionGui", compactFields({ name: optionalString(input, "name") ?? "Response Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "Assertion.test_field": optionalString(input, "field") ?? "Assertion.response_data", "Assertion.test_type": responseAssertionType(optionalString(input, "matchType") ?? "contains"), "Assertion.test_strings": jsonField(patternsInput(input)), "Assertion.invert": optionalBoolean(input, "invert") })); }
 function addJsonAssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSONPathAssertion", "JSONPathAssertionGui", compactFields({ name: optionalString(input, "name") ?? "JSON Assertion", enabled: optionalBoolean(input, "enabled") ?? true, JSON_PATH: requiredString(input, "jsonPath"), EXPECTED_VALUE: optionalString(input, "expectedValue"), JSONVALIDATION: optionalBoolean(input, "validateJson") ?? true, EXPECT_NULL: optionalBoolean(input, "expectNull") ?? false, INVERT: optionalBoolean(input, "invert") ?? false, ISREGEX: optionalBoolean(input, "regex") ?? true })); }
 function addXPathAssertionOperation(input: ToolCallInput): SemanticPatchOperation { const xpath2 = optionalBoolean(input, "xpath2") ?? false; return typedAddOperation(input, xpath2 ? "XPath2Assertion" : "XPathAssertion", xpath2 ? "XPath2Panel" : "XPathAssertionGui", compactFields({ name: optionalString(input, "name") ?? "XPath Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "XPath.xpath": requiredString(input, "xpath"), "XPath.validate": optionalBoolean(input, "validateXml") ?? false, "XPath.whitespace": optionalBoolean(input, "whitespace") ?? false, "XPath.tolerant": optionalBoolean(input, "tolerant") ?? false, "XPath.negate": optionalBoolean(input, "invert") ?? false })); }
 function addDurationAssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "DurationAssertion", "DurationAssertionGui", compactFields({ name: optionalString(input, "name") ?? "Duration Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "DurationAssertion.duration": optionalScalar(input, "durationMs") })); }
 function addSizeAssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "SizeAssertion", "SizeAssertionGui", compactFields({ name: optionalString(input, "name") ?? "Size Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "SizeAssertion.size": optionalScalar(input, "sizeBytes"), "SizeAssertion.operator": optionalString(input, "operator") ?? "=" })); }
-function addJsr223AssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Assertion", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Assertion", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters") })); }
-
+function addJsr223AssertionOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSR223Assertion", "TestBeanGUI", jsr223Fields(input, "JSR223 Assertion")); }
 function addRegexExtractorOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "RegexExtractor", "RegexExtractorGui", compactFields({ name: optionalString(input, "name") ?? "Regular Expression Extractor", enabled: optionalBoolean(input, "enabled") ?? true, "RegexExtractor.refname": requiredString(input, "variableName"), "RegexExtractor.regex": requiredString(input, "regex"), "RegexExtractor.template": optionalString(input, "template") ?? "$1$", "RegexExtractor.default": optionalString(input, "defaultValue"), "RegexExtractor.match_number": optionalScalar(input, "matchNumber") ?? 1, "RegexExtractor.useHeaders": optionalString(input, "source") })); }
 function addJsonExtractorOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JSONPostProcessor", "JSONPostProcessorGui", compactFields({ name: optionalString(input, "name") ?? "JSON Extractor", enabled: optionalBoolean(input, "enabled") ?? true, "JSONPostProcessor.referenceNames": requiredString(input, "variableName"), "JSONPostProcessor.jsonPathExprs": requiredString(input, "jsonPath"), "JSONPostProcessor.match_numbers": optionalScalar(input, "matchNumber") ?? 1, "JSONPostProcessor.defaultValues": optionalString(input, "defaultValue"), "JSONPostProcessor.compute_concat": optionalBoolean(input, "concat") ?? false })); }
 function addBoundaryExtractorOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "BoundaryExtractor", "BoundaryExtractorGui", compactFields({ name: optionalString(input, "name") ?? "Boundary Extractor", enabled: optionalBoolean(input, "enabled") ?? true, "BoundaryExtractor.refname": requiredString(input, "variableName"), "BoundaryExtractor.lboundary": requiredString(input, "leftBoundary"), "BoundaryExtractor.rboundary": requiredString(input, "rightBoundary"), "BoundaryExtractor.default": optionalString(input, "defaultValue"), "BoundaryExtractor.match_number": optionalScalar(input, "matchNumber") ?? 1, "BoundaryExtractor.useHeaders": optionalString(input, "source") })); }
 function addXPathExtractorOperation(input: ToolCallInput): SemanticPatchOperation { const xpath2 = optionalBoolean(input, "xpath2") ?? false; return typedAddOperation(input, xpath2 ? "XPath2Extractor" : "XPathExtractor", xpath2 ? "XPath2ExtractorGui" : "XPathExtractorGui", compactFields({ name: optionalString(input, "name") ?? "XPath Extractor", enabled: optionalBoolean(input, "enabled") ?? true, "XPathExtractor.refname": requiredString(input, "variableName"), "XPathExtractor.xpathQuery": requiredString(input, "xpath"), "XPathExtractor.default": optionalString(input, "defaultValue"), "XPathExtractor.matchNumber": optionalScalar(input, "matchNumber") ?? 1, "XPathExtractor.fragment": optionalBoolean(input, "fragment") ?? false, "XPathExtractor.validate": optionalBoolean(input, "validateXml") ?? false, "XPathExtractor.whitespace": optionalBoolean(input, "whitespace") ?? false, "XPathExtractor.tolerant": optionalBoolean(input, "tolerant") ?? false })); }
 function addCssExtractorOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "HtmlExtractor", "HtmlExtractorGui", compactFields({ name: optionalString(input, "name") ?? "CSS Selector Extractor", enabled: optionalBoolean(input, "enabled") ?? true, "HtmlExtractor.refname": requiredString(input, "variableName"), "HtmlExtractor.expr": requiredString(input, "selector"), "HtmlExtractor.attribute": optionalString(input, "attribute") ?? "", "HtmlExtractor.default": optionalString(input, "defaultValue"), "HtmlExtractor.match_number": optionalScalar(input, "matchNumber") ?? 1, "HtmlExtractor.extractor_impl": optionalString(input, "implementation") ?? "CSS" })); }
-
+function addJsr223ProcessorOperation(input: ToolCallInput, nodeType: string, defaultName: string): SemanticPatchOperation { return typedAddOperation(input, nodeType, "TestBeanGUI", jsr223Fields(input, defaultName)); }
+function addJdbcPreProcessorOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "JDBCPreProcessor", "TestBeanGUI", jdbcFields(input, "JDBC PreProcessor")); }
+function addUserParametersOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "UserParameters", "UserParametersGui", compactFields({ name: optionalString(input, "name") ?? "User Parameters", enabled: optionalBoolean(input, "enabled") ?? true, "UserParameters.names": jsonField(input.variables ?? {}), "UserParameters.per_iteration": optionalBoolean(input, "perIteration") ?? false })); }
+function addUrlRewritingModifierOperation(input: ToolCallInput): SemanticPatchOperation { return typedAddOperation(input, "URLRewritingModifier", "URLRewritingModifierGui", compactFields({ name: optionalString(input, "name") ?? "HTTP URL Re-writing Modifier", enabled: optionalBoolean(input, "enabled") ?? true, argument_name: requiredString(input, "argumentName"), path_extension: optionalBoolean(input, "pathExtension") ?? false, encode: optionalBoolean(input, "encode") ?? true, cache_value: optionalBoolean(input, "cacheValue") ?? true })); }
+function jdbcFields(input: ToolCallInput, defaultName: string): Record<string, unknown> { return compactFields({ name: optionalString(input, "name") ?? defaultName, enabled: optionalBoolean(input, "enabled") ?? true, dataSource: requiredString(input, "dataSource"), query: requiredString(input, "query"), queryType: optionalString(input, "queryType") ?? "Select Statement", queryArguments: optionalString(input, "parameters"), variableNames: Array.isArray(input.variableNames) ? input.variableNames.join(",") : undefined, resultVariable: optionalString(input, "resultVariable") }); }
+function jsr223Fields(input: ToolCallInput, defaultName: string): Record<string, unknown> { return compactFields({ name: optionalString(input, "name") ?? defaultName, enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters"), cacheKey: optionalString(input, "cacheKey") }); }
 function httpTargetFields(input: ToolCallInput, defaultName: string): Record<string, unknown> { const fields: Record<string, unknown> = { name: optionalString(input, "name") ?? defaultName, enabled: optionalBoolean(input, "enabled") ?? true }; setIfPresent(fields, "HTTPSampler.protocol", optionalString(input, "protocol")); setIfPresent(fields, "HTTPSampler.domain", optionalString(input, "domain")); setIfPresent(fields, "HTTPSampler.port", optionalScalar(input, "port")); return fields; }
-function typedAddOperation(input: ToolCallInput, nodeType: string, guiClass: string, fields: Record<string, unknown>): SemanticPatchOperation { const parentNodeId = optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "parentNodeId"); const index = optionalNumber(input, "index"); return { op: "addNode", parentNodeId, nodeType, fields: { ...fields, guiClass }, ...(index !== undefined ? { index } : {}) }; }
 function addNodeOperation(input: ToolCallInput): SemanticPatchOperation { const parentNodeId = optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "parentNodeId"); const nodeType = optionalString(input, "nodeType") ?? optionalString(input, "type") ?? requiredString(input, "nodeType"); const fields = objectInput(input, "fields"); const index = optionalNumber(input, "index"); return { op: "addNode", parentNodeId, nodeType, ...(fields ? { fields } : {}), ...(index !== undefined ? { index } : {}) }; }
 function updateFieldOperation(input: ToolCallInput): SemanticPatchOperation { return { op: "updateField", nodeId: requiredString(input, "nodeId"), fieldPath: optionalString(input, "fieldPath") ?? optionalString(input, "field") ?? requiredString(input, "fieldPath"), value: input.value }; }
 function deleteNodeOperation(input: ToolCallInput): SemanticPatchOperation { return { op: "deleteNode", nodeId: requiredString(input, "nodeId") }; }
 function moveNodeOperation(input: ToolCallInput): SemanticPatchOperation { const toParentNodeId = optionalString(input, "toParentNodeId") ?? optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "toParentNodeId"); const index = optionalNumber(input, "index"); return { op: "moveNode", nodeId: requiredString(input, "nodeId"), toParentNodeId, ...(index !== undefined ? { index } : {}) }; }
 function cloneNodeOperation(input: ToolCallInput): SemanticPatchOperation { const toParentNodeId = optionalString(input, "toParentNodeId") ?? optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "toParentNodeId"); const index = optionalNumber(input, "index"); return { op: "cloneNode", nodeId: requiredString(input, "nodeId"), toParentNodeId, ...(index !== undefined ? { index } : {}) }; }
 function setEnabledOperation(input: ToolCallInput, enabled: boolean): SemanticPatchOperation { return { op: "setEnabled", nodeId: requiredString(input, "nodeId"), enabled }; }
-
 function summarizePlanLanguage(nodes: Array<{ role: string; type: string; enabled: boolean; children?: unknown[] }>): Record<string, unknown> { const roles: Record<string, number> = {}; const types: Record<string, number> = {}; let disabled = 0; let total = 0; const visit = (node: { role: string; type: string; enabled: boolean; children?: unknown[] }): void => { total += 1; roles[node.role] = (roles[node.role] ?? 0) + 1; types[node.type] = (types[node.type] ?? 0) + 1; if (!node.enabled) disabled += 1; for (const child of node.children ?? []) visit(child as { role: string; type: string; enabled: boolean; children?: unknown[] }); }; for (const node of nodes) visit(node); return { totalNodes: total, disabledNodes: disabled, roles, types }; }
 function requiredString(input: ToolCallInput, key: string): string { const value = input[key]; if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is required`); return value; }
 function optionalString(input: ToolCallInput, key: string): string | undefined { const value = input[key]; return typeof value === "string" && value.length > 0 ? value : undefined; }
