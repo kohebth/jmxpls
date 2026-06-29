@@ -1,5 +1,6 @@
 package io.jmxpls.bridge;
 
+import io.jmxpls.bridge.jmeter.ComponentCatalogCommand;
 import io.jmxpls.bridge.jmeter.JMeterBootstrap;
 import io.jmxpls.bridge.jmeter.JmxLoadCommand;
 import io.jmxpls.bridge.jmeter.JmxSaveCommand;
@@ -37,6 +38,7 @@ public final class BridgeServer {
         return switch (command) {
             case "ping" -> success(id, "{\"pong\":true}");
             case "environment" -> success(id, JMeterBootstrap.environmentJson());
+            case "componentCatalog" -> success(id, new ComponentCatalogCommand().execute());
             case "loadJmx" -> success(id, new JmxLoadCommand().execute(path));
             case "saveJmx" -> success(id, new JmxSaveCommand().execute(path));
             case "validateJmx" -> success(id, new JmxValidateCommand().execute(path));
