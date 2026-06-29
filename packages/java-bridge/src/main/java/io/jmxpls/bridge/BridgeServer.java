@@ -6,6 +6,7 @@ import io.jmxpls.bridge.jmeter.JmxLoadCommand;
 import io.jmxpls.bridge.jmeter.JmxSaveCommand;
 import io.jmxpls.bridge.jmeter.JmxValidateCommand;
 import io.jmxpls.bridge.jmeter.RoundTripCommand;
+import io.jmxpls.bridge.protocol.BridgeResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,11 +49,11 @@ public final class BridgeServer {
     }
 
     private static String success(String id, String dataJson) {
-        return "{\"id\":\"" + escape(id) + "\",\"success\":true,\"data\":" + dataJson + ",\"diagnostics\":[]}";
+        return BridgeResponse.success(id, dataJson).toJson();
     }
 
     private static String failure(String id, String code, String message) {
-        return "{\"id\":\"" + escape(id) + "\",\"success\":false,\"diagnostics\":[{\"code\":\"" + escape(code) + "\",\"severity\":\"error\",\"message\":\"" + escape(message) + "\"}]}";
+        return BridgeResponse.failure(id, code, message).toJson();
     }
 
     private static String extractString(String json, String field, String fallback) {
@@ -68,9 +69,5 @@ public final class BridgeServer {
             return fallback;
         }
         return json.substring(start + 1, end);
-    }
-
-    private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
