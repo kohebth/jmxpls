@@ -81,6 +81,11 @@ describe("JmxplsRuntime", () => {
     const loaded = await runtime.callTool("load_component_catalog");
     expect((loaded.data as { count: number }).count).toBeGreaterThan(1);
 
+    const summary = runtime.readResource("jmxpls://catalog/summary");
+    expect((summary.data as { count: number }).count).toBeGreaterThan(1);
+    const typeResource = runtime.readResource("jmxpls://catalog/types/HTTPSamplerProxy");
+    expect((typeResource.data as { displayName: string }).displayName).toBe("HTTP Request");
+
     const list = await runtime.callTool("list_component_types", { role: "sampler" });
     expect((list.data as { components: Array<{ type: string }> }).components.some((item) => item.type === "HTTPSamplerProxy")).toBe(true);
 
@@ -100,6 +105,8 @@ describe("JmxplsRuntime", () => {
     expect(imported.success).toBe(true);
     const plugin = await runtime.callTool("inspect_component_schema", { type: "PluginSampler" });
     expect((plugin.data as { displayName: string }).displayName).toBe("Plugin Sampler");
+    const pluginResource = runtime.readResource("jmxpls://catalog/types/PluginSampler");
+    expect((pluginResource.data as { displayName: string }).displayName).toBe("Plugin Sampler");
   });
 
   it("serves and instantiates built-in templates", async () => {
