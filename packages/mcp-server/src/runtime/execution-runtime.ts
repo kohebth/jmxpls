@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import {
+  BridgeClient,
   buildJMeterCliCommand,
   checkSla,
   compareJtlMetrics,
@@ -9,7 +10,11 @@ import {
   parseJtlCsv,
   renderMetricsReport,
   RunManager,
+  validateWithJMeter,
+  type BridgeClientOptions,
+  type BridgeResponse,
   type JMeterCommand,
+  type JMeterValidationMode,
   type SlaThresholds
 } from "@jmxpls/core";
 
@@ -29,6 +34,8 @@ export class JmxplsRuntime extends BaseRuntime {
     if (executionResult) return executionResult;
     const rawResult = await this.callRawTool(name, input);
     if (rawResult) return rawResult;
+    const bridgeValidationResult = await this.callBridgeValidationTool(name, input);
+    if (bridgeValidationResult) return bridgeValidationResult;
     const catalogResult = await this.catalogTools.callTool(name, input);
     if (catalogResult) return catalogResult;
     const templateResult = await this.templateTools.callTool(name, input, this);
@@ -94,6 +101,36 @@ export class JmxplsRuntime extends BaseRuntime {
       }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown raw tool error" };
+    }
+  }
+
+  private async callBridgeValidationTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
+    if (name !== "validate_with_jmeter" && name !== "roundtrip_validate") {
+      return undefined;
+    }
+    const path = optionalPath(input, ["path", "planPath", "jmxPath"]);
+    if (!path) {
+      return undefined;
+    }
+
+    const mode = name === "roundtrip_validate" ? "loadSaveReload" : validationMode(input);
+    const options = bridgeOptionsFromEnv();
+    if (!options) {
+      return bridgeNotConfigured(path, mode, input.strict === true);
+    }
+
+    const bridge = new BridgeClient(options);
+    try {
+      if (name === "roundtrip_validate") {
+        const response = await bridge.roundTripJmx(path);
+        return { success: true, data: bridgeResponseData(path, mode, response) };
+      }
+      const result = await validateWithJMeter(bridge, { path, mode });
+      return { success: true, data: { path, mode: result.mode, jmeterBacked: true, valid: result.valid, diagnostics: result.diagnostics } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Unknown JMeter bridge validation error" };
+    } finally {
+      bridge.close();
     }
   }
 
@@ -189,6 +226,49 @@ async function checkJtlSla(input: ToolCallInput): Promise<ToolCallResult> {
     minThroughput: optionalNumber(input, "minThroughput")
   });
   return { success: true, data: { path, thresholds, result: checkSla(samples, thresholds) } };
+}
+
+function bridgeOptionsFromEnv(): BridgeClientOptions | undefined {
+  const jarPath = process.env.JMXPLS_JAVA_BRIDGE_JAR;
+  if (!jarPath) {
+    return undefined;
+  }
+  const timeoutMs = process.env.JMXPLS_JAVA_BRIDGE_TIMEOUT_MS ? Number(process.env.JMXPLS_JAVA_BRIDGE_TIMEOUT_MS) : undefined;
+  return {
+    jarPath,
+    ...(process.env.JMXPLS_JAVA_COMMAND ? { javaCommand: process.env.JMXPLS_JAVA_COMMAND } : {}),
+    ...(timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {})
+  };
+}
+
+function validationMode(input: ToolCallInput): JMeterValidationMode {
+  const mode = optionalString(input, "mode");
+  if (mode === "load" || mode === "loadSave" || mode === "loadSaveReload") {
+    return mode;
+  }
+  return "loadSaveReload";
+}
+
+function bridgeNotConfigured(path: string, mode: JMeterValidationMode, strict: boolean): ToolCallResult {
+  const severity = strict ? "error" : "warning";
+  const diagnostics = [{
+    code: "JMX_JMETER_BRIDGE_NOT_CONFIGURED",
+    severity,
+    message: "JMeter bridge validation is not configured in this runtime yet; returned bridge validation fallback.",
+    fixSuggestion: "Set JMXPLS_JAVA_BRIDGE_JAR to the Java bridge executable jar before using path-based JMeter validation."
+  }];
+  return { success: true, data: { path, mode, jmeterBacked: false, valid: severity !== "error", diagnostics } };
+}
+
+function bridgeResponseData(path: string, mode: JMeterValidationMode, response: BridgeResponse<{ path: string; valid?: boolean; reason?: string }>): Record<string, unknown> {
+  return {
+    path,
+    mode,
+    jmeterBacked: true,
+    valid: response.success && response.data?.valid === true,
+    diagnostics: response.diagnostics,
+    bridge: response.data ?? null
+  };
 }
 
 function rawAddInput(input: ToolCallInput): ToolCallInput {

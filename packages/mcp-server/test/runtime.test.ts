@@ -49,6 +49,26 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(planPath, "utf8")).toContain('enabled="false"');
   });
 
+  it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
+    const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
+    delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
+    try {
+      const runtime = new JmxplsRuntime();
+      const result = await runtime.callTool("validate_with_jmeter", { path: "plan.jmx", strict: true });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { jmeterBacked: boolean }).jmeterBacked).toBe(false);
+      expect((result.data as { valid: boolean }).valid).toBe(false);
+      expect((result.data as { diagnostics: Array<{ code: string }> }).diagnostics[0]?.code).toBe("JMX_JMETER_BRIDGE_NOT_CONFIGURED");
+    } finally {
+      if (previousJar === undefined) {
+        delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
+      } else {
+        process.env.JMXPLS_JAVA_BRIDGE_JAR = previousJar;
+      }
+    }
+  });
+
   it("plans JMeter runs, exposes resources, and analyzes JTL files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-exec-"));
     const planPath = join(dir, "plan.jmx");
