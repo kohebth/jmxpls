@@ -59,4 +59,20 @@ Raw tools are reserved for unknown/plugin nodes and low-level recovery work. Pre
 
 ## Catalog Tools
 
-Catalog tools load, refresh, inspect, import, and export component descriptors for typed or plugin-aware workflows. Use `inspect_component_schema`, `list_component_types`, and `get_component_defaults` before adding unfamiliar components.
+Catalog tools load, refresh, inspect, import, and export component descriptors for typed or plugin-aware workflows.
+
+- `load_component_catalog` and `refresh_component_catalog` load the built-in descriptor set.
+- `list_component_types` can filter by role, such as `sampler` or `config`.
+- `inspect_component_schema` returns the descriptor for a component type.
+- `get_component_defaults` returns starter fields derived from the descriptor.
+- `import_component_catalog` merges a JSON catalog object or file path into the active catalog.
+- `export_component_catalog` returns the active merged catalog.
+
+## Template Tools
+
+Template tools expose built-in patch templates. Current built-ins are scaffolds that return semantic patches; some templates still have empty operation lists until the generator phase fills them in.
+
+- `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.
+- `create_http_api_plan`, `create_login_flow`, `create_bearer_token_flow`, `create_crud_flow`, and `create_csv_driven_flow` are aliases for built-in templates.
+- `prepare_plan_for_ci` forwards to GUI-listener disabling.
+- `convert_hardcoded_values_to_variables` currently supports host-to-variable conversion through `host` and `variableName`.
