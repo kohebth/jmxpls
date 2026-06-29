@@ -36,6 +36,7 @@ const HTTP_TARGET_OPTIONALS: FieldRule[] = [
 ];
 const TYPED_ADD_OPTIONALS: FieldRule[] = [...PARENT_OPTIONALS, { name: "name", type: "string" }, ...POSITION_OPTIONALS];
 const TIMER_COMMON_OPTIONALS: FieldRule[] = [...TYPED_ADD_OPTIONALS, { name: "delayMs", type: "stringOrNumber" }];
+const EXTRACTOR_OPTIONALS: FieldRule[] = [...TYPED_ADD_OPTIONALS, { name: "defaultValue", type: "string" }, { name: "matchNumber", type: "stringOrNumber" }];
 
 const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   open_plan: { required: [{ name: "path", type: "string" }] },
@@ -95,6 +96,11 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   add_duration_assertion: { required: [PLAN_ID, { name: "durationMs", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: TYPED_ADD_OPTIONALS },
   add_size_assertion: { required: [PLAN_ID, { name: "sizeBytes", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "operator", type: "string" }] },
   add_jsr223_assertion: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "language", type: "string" }, { name: "script", type: "string" }, { name: "filename", type: "string" }, { name: "parameters", type: "string" }] },
+  add_regex_extractor: { required: [PLAN_ID, { name: "variableName", type: "string" }, { name: "regex", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...EXTRACTOR_OPTIONALS, { name: "template", type: "string" }, { name: "source", type: "string" }] },
+  add_json_extractor: { required: [PLAN_ID, { name: "variableName", type: "string" }, { name: "jsonPath", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...EXTRACTOR_OPTIONALS, { name: "concat", type: "boolean" }] },
+  add_boundary_extractor: { required: [PLAN_ID, { name: "variableName", type: "string" }, { name: "leftBoundary", type: "string" }, { name: "rightBoundary", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...EXTRACTOR_OPTIONALS, { name: "source", type: "string" }] },
+  add_xpath_extractor: { required: [PLAN_ID, { name: "variableName", type: "string" }, { name: "xpath", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...EXTRACTOR_OPTIONALS, { name: "xpath2", type: "boolean" }, { name: "fragment", type: "boolean" }, { name: "validateXml", type: "boolean" }, { name: "whitespace", type: "boolean" }, { name: "tolerant", type: "boolean" }] },
+  add_css_extractor: { required: [PLAN_ID, { name: "variableName", type: "string" }, { name: "selector", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...EXTRACTOR_OPTIONALS, { name: "attribute", type: "string" }, { name: "implementation", type: "string" }] },
   save_plan: { required: [PLAN_ID], optional: [{ name: "path", type: "string" }, { name: "backup", type: "boolean" }] },
   save_plan_as: { required: [PLAN_ID, { name: "path", type: "string" }], optional: [{ name: "backup", type: "boolean" }] }
 };

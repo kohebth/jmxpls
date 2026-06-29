@@ -27,6 +27,7 @@ const PLAN_LANGUAGE_OPTIONS = {
 const HTTP_TARGET_FIELDS = { name: NON_EMPTY_STRING, protocol: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, port: STRING_OR_NUMBER, path: NON_EMPTY_STRING };
 const POSITION_AND_FLAGS = { enabled: BOOLEAN, index: INTEGER, ...PATCH_FLAGS };
 const TYPED_ADD_BASE = { ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, ...POSITION_AND_FLAGS };
+const EXTRACTOR_BASE = { ...TYPED_ADD_BASE, variableName: NON_EMPTY_STRING, defaultValue: NON_EMPTY_STRING, matchNumber: STRING_OR_NUMBER };
 
 export const SESSION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   open_plan: objectSchema({ path: NON_EMPTY_STRING }, ["path"]),
@@ -111,6 +112,14 @@ export const ASSERTION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   add_duration_assertion: objectSchema({ ...TYPED_ADD_BASE, durationMs: STRING_OR_NUMBER }, ["planId", "durationMs"], PARENT_ONE_OF),
   add_size_assertion: objectSchema({ ...TYPED_ADD_BASE, sizeBytes: STRING_OR_NUMBER, operator: NON_EMPTY_STRING }, ["planId", "sizeBytes"], PARENT_ONE_OF),
   add_jsr223_assertion: objectSchema({ ...TYPED_ADD_BASE, language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING }, ["planId"], PARENT_ONE_OF)
+};
+
+export const EXTRACTOR_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
+  add_regex_extractor: objectSchema({ ...EXTRACTOR_BASE, regex: NON_EMPTY_STRING, template: NON_EMPTY_STRING, source: NON_EMPTY_STRING }, ["planId", "variableName", "regex"], PARENT_ONE_OF),
+  add_json_extractor: objectSchema({ ...EXTRACTOR_BASE, jsonPath: NON_EMPTY_STRING, concat: BOOLEAN }, ["planId", "variableName", "jsonPath"], PARENT_ONE_OF),
+  add_boundary_extractor: objectSchema({ ...EXTRACTOR_BASE, leftBoundary: NON_EMPTY_STRING, rightBoundary: NON_EMPTY_STRING, source: NON_EMPTY_STRING }, ["planId", "variableName", "leftBoundary", "rightBoundary"], PARENT_ONE_OF),
+  add_xpath_extractor: objectSchema({ ...EXTRACTOR_BASE, xpath: NON_EMPTY_STRING, xpath2: BOOLEAN, fragment: BOOLEAN, validateXml: BOOLEAN, whitespace: BOOLEAN, tolerant: BOOLEAN }, ["planId", "variableName", "xpath"], PARENT_ONE_OF),
+  add_css_extractor: objectSchema({ ...EXTRACTOR_BASE, selector: NON_EMPTY_STRING, attribute: NON_EMPTY_STRING, implementation: NON_EMPTY_STRING }, ["planId", "variableName", "selector"], PARENT_ONE_OF)
 };
 
 export const VALIDATION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
