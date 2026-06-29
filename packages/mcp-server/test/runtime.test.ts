@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -36,5 +36,25 @@ describe("JmxplsRuntime", () => {
     const saved = await runtime.callTool("save_plan", { planId, backup: false });
     expect(saved.success).toBe(true);
     expect(readFileSync(planPath, "utf8")).toContain('enabled="false"');
+  });
+
+  it("plans JMeter runs and analyzes JTL files", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-exec-"));
+    const planPath = join(dir, "plan.jmx");
+    const jtlPath = join(dir, "results.jtl");
+    writeFileSync(planPath, "<jmeterTestPlan />");
+    writeFileSync(jtlPath, "elapsed,label,responseCode,success\n100,GET /,200,true\n300,POST /,500,false\n");
+
+    const runtime = new JmxplsRuntime();
+    const run = await runtime.callTool("run_jmeter", { planPath, jtlPath });
+    expect(run.success).toBe(true);
+    const runId = (run.data as { run: { runId: string } }).run.runId;
+
+    const status = await runtime.callTool("get_run_status", { runId });
+    expect((status.data as { artifacts: string[] }).artifacts).toContain(jtlPath);
+
+    const analysis = await runtime.callTool("analyze_jtl", { jtlPath });
+    expect(analysis.success).toBe(true);
+    expect((analysis.data as { metrics: { errors: number } }).metrics.errors).toBe(1);
   });
 });
