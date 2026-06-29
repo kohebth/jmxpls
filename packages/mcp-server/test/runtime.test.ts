@@ -75,4 +75,30 @@ describe("JmxplsRuntime", () => {
     expect(analysis.success).toBe(true);
     expect((analysis.data as { metrics: { errors: number } }).metrics.errors).toBe(1);
   });
+
+  it("serves and merges component catalogs", async () => {
+    const runtime = new JmxplsRuntime();
+    const loaded = await runtime.callTool("load_component_catalog");
+    expect((loaded.data as { count: number }).count).toBeGreaterThan(1);
+
+    const list = await runtime.callTool("list_component_types", { role: "sampler" });
+    expect((list.data as { components: Array<{ type: string }> }).components.some((item) => item.type === "HTTPSamplerProxy")).toBe(true);
+
+    const schema = await runtime.callTool("inspect_component_schema", { type: "HTTPSamplerProxy" });
+    expect((schema.data as { displayName: string }).displayName).toBe("HTTP Request");
+
+    const defaults = await runtime.callTool("get_component_defaults", { type: "HTTPSamplerProxy" });
+    expect((defaults.data as { fields: { enabled: boolean; method: string } }).fields.enabled).toBe(true);
+
+    const imported = await runtime.callTool("import_component_catalog", {
+      catalog: {
+        version: 1,
+        source: "dynamic",
+        components: [{ type: "PluginSampler", role: "sampler", displayName: "Plugin Sampler", xmlTags: ["PluginSampler"], testClasses: ["PluginSampler"], guiClasses: ["PluginGui"], fields: [{ name: "target", type: "string" }] }]
+      }
+    });
+    expect(imported.success).toBe(true);
+    const plugin = await runtime.callTool("inspect_component_schema", { type: "PluginSampler" });
+    expect((plugin.data as { displayName: string }).displayName).toBe("Plugin Sampler");
+  });
 });
