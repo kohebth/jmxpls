@@ -101,4 +101,19 @@ describe("JmxplsRuntime", () => {
     const plugin = await runtime.callTool("inspect_component_schema", { type: "PluginSampler" });
     expect((plugin.data as { displayName: string }).displayName).toBe("Plugin Sampler");
   });
+
+  it("serves and instantiates built-in templates", async () => {
+    const runtime = new JmxplsRuntime();
+    const templates = await runtime.callTool("list_templates");
+    expect((templates.data as Array<{ name: string }>).some((template) => template.name === "http_api_baseline")).toBe(true);
+
+    const template = await runtime.callTool("get_template", { name: "http_api_baseline" });
+    expect((template.data as { patch: { operations: unknown[] } }).patch.operations).toEqual([]);
+
+    const instantiated = await runtime.callTool("instantiate_template", { name: "http_api_baseline", dryRun: true });
+    expect((instantiated.data as { patch: { dryRun: boolean } }).patch.dryRun).toBe(true);
+
+    const alias = await runtime.callTool("create_bearer_token_flow");
+    expect((alias.data as { name: string }).name).toBe("http_api_login_bearer_token");
+  });
 });
