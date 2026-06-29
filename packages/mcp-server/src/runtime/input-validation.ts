@@ -35,6 +35,7 @@ const HTTP_TARGET_OPTIONALS: FieldRule[] = [
   ...POSITION_OPTIONALS
 ];
 const TYPED_ADD_OPTIONALS: FieldRule[] = [...PARENT_OPTIONALS, { name: "name", type: "string" }, ...POSITION_OPTIONALS];
+const TIMER_COMMON_OPTIONALS: FieldRule[] = [...TYPED_ADD_OPTIONALS, { name: "delayMs", type: "stringOrNumber" }];
 
 const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   open_plan: { required: [{ name: "path", type: "string" }] },
@@ -83,6 +84,17 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   add_smtp_sampler: { required: [PLAN_ID, { name: "server", type: "string" }, { name: "recipient", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "sender", type: "string" }, { name: "subject", type: "string" }, { name: "body", type: "string" }] },
   add_jsr223_sampler: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "language", type: "string" }, { name: "script", type: "string" }, { name: "filename", type: "string" }, { name: "parameters", type: "string" }] },
   add_debug_sampler: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "displayJMeterVariables", type: "boolean" }, { name: "displayJMeterProperties", type: "boolean" }, { name: "displaySystemProperties", type: "boolean" }] },
+  add_constant_timer: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: TIMER_COMMON_OPTIONALS },
+  add_random_timer: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TIMER_COMMON_OPTIONALS, { name: "distribution", type: "string", enum: ["uniform", "gaussian", "poisson"] }, { name: "rangeMs", type: "stringOrNumber" }, { name: "deviationMs", type: "stringOrNumber" }, { name: "lambdaMs", type: "stringOrNumber" }] },
+  add_sync_timer: { required: [PLAN_ID, { name: "groupSize", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "timeoutMs", type: "stringOrNumber" }] },
+  add_throughput_timer: { required: [PLAN_ID, { name: "targetThroughput", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "calcMode", type: "stringOrNumber" }, { name: "precise", type: "boolean" }, { name: "throughputPeriod", type: "stringOrNumber" }, { name: "durationSeconds", type: "stringOrNumber" }, { name: "batchSize", type: "stringOrNumber" }, { name: "batchThreadDelay", type: "stringOrNumber" }] },
+  add_jsr223_timer: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "language", type: "string" }, { name: "script", type: "string" }, { name: "filename", type: "string" }, { name: "parameters", type: "string" }, { name: "cacheKey", type: "string" }] },
+  add_response_assertion: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES, [{ name: "patterns", type: "array" }, { name: "pattern", type: "string" }]], optional: [...TYPED_ADD_OPTIONALS, { name: "field", type: "string" }, { name: "matchType", type: "string" }, { name: "invert", type: "boolean" }] },
+  add_json_assertion: { required: [PLAN_ID, { name: "jsonPath", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "expectedValue", type: "string" }, { name: "validateJson", type: "boolean" }, { name: "expectNull", type: "boolean" }, { name: "invert", type: "boolean" }, { name: "regex", type: "boolean" }] },
+  add_xpath_assertion: { required: [PLAN_ID, { name: "xpath", type: "string" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "xpath2", type: "boolean" }, { name: "validateXml", type: "boolean" }, { name: "whitespace", type: "boolean" }, { name: "tolerant", type: "boolean" }, { name: "invert", type: "boolean" }] },
+  add_duration_assertion: { required: [PLAN_ID, { name: "durationMs", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: TYPED_ADD_OPTIONALS },
+  add_size_assertion: { required: [PLAN_ID, { name: "sizeBytes", type: "stringOrNumber" }], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "operator", type: "string" }] },
+  add_jsr223_assertion: { required: [PLAN_ID], requiredOneOf: [PARENT_ID_ALIASES], optional: [...TYPED_ADD_OPTIONALS, { name: "language", type: "string" }, { name: "script", type: "string" }, { name: "filename", type: "string" }, { name: "parameters", type: "string" }] },
   save_plan: { required: [PLAN_ID], optional: [{ name: "path", type: "string" }, { name: "backup", type: "boolean" }] },
   save_plan_as: { required: [PLAN_ID, { name: "path", type: "string" }], optional: [{ name: "backup", type: "boolean" }] }
 };

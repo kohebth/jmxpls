@@ -96,6 +96,23 @@ export const SAMPLER_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   add_debug_sampler: objectSchema({ ...TYPED_ADD_BASE, displayJMeterVariables: BOOLEAN, displayJMeterProperties: BOOLEAN, displaySystemProperties: BOOLEAN }, ["planId"], PARENT_ONE_OF)
 };
 
+export const TIMER_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
+  add_constant_timer: objectSchema({ ...TYPED_ADD_BASE, delayMs: STRING_OR_NUMBER }, ["planId"], PARENT_ONE_OF),
+  add_random_timer: objectSchema({ ...TYPED_ADD_BASE, distribution: { type: "string", enum: ["uniform", "gaussian", "poisson"] }, delayMs: STRING_OR_NUMBER, rangeMs: STRING_OR_NUMBER, deviationMs: STRING_OR_NUMBER, lambdaMs: STRING_OR_NUMBER }, ["planId"], PARENT_ONE_OF),
+  add_sync_timer: objectSchema({ ...TYPED_ADD_BASE, groupSize: STRING_OR_NUMBER, timeoutMs: STRING_OR_NUMBER }, ["planId", "groupSize"], PARENT_ONE_OF),
+  add_throughput_timer: objectSchema({ ...TYPED_ADD_BASE, targetThroughput: STRING_OR_NUMBER, calcMode: STRING_OR_NUMBER, precise: BOOLEAN, throughputPeriod: STRING_OR_NUMBER, durationSeconds: STRING_OR_NUMBER, batchSize: STRING_OR_NUMBER, batchThreadDelay: STRING_OR_NUMBER }, ["planId", "targetThroughput"], PARENT_ONE_OF),
+  add_jsr223_timer: objectSchema({ ...TYPED_ADD_BASE, language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING, cacheKey: NON_EMPTY_STRING }, ["planId"], PARENT_ONE_OF)
+};
+
+export const ASSERTION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
+  add_response_assertion: objectSchema({ ...TYPED_ADD_BASE, patterns: ARRAY, pattern: NON_EMPTY_STRING, field: NON_EMPTY_STRING, matchType: NON_EMPTY_STRING, invert: BOOLEAN }, ["planId"], { allOf: [PARENT_ONE_OF, { anyOf: [{ required: ["patterns"] }, { required: ["pattern"] }] }] }),
+  add_json_assertion: objectSchema({ ...TYPED_ADD_BASE, jsonPath: NON_EMPTY_STRING, expectedValue: NON_EMPTY_STRING, validateJson: BOOLEAN, expectNull: BOOLEAN, invert: BOOLEAN, regex: BOOLEAN }, ["planId", "jsonPath"], PARENT_ONE_OF),
+  add_xpath_assertion: objectSchema({ ...TYPED_ADD_BASE, xpath: NON_EMPTY_STRING, xpath2: BOOLEAN, validateXml: BOOLEAN, whitespace: BOOLEAN, tolerant: BOOLEAN, invert: BOOLEAN }, ["planId", "xpath"], PARENT_ONE_OF),
+  add_duration_assertion: objectSchema({ ...TYPED_ADD_BASE, durationMs: STRING_OR_NUMBER }, ["planId", "durationMs"], PARENT_ONE_OF),
+  add_size_assertion: objectSchema({ ...TYPED_ADD_BASE, sizeBytes: STRING_OR_NUMBER, operator: NON_EMPTY_STRING }, ["planId", "sizeBytes"], PARENT_ONE_OF),
+  add_jsr223_assertion: objectSchema({ ...TYPED_ADD_BASE, language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING }, ["planId"], PARENT_ONE_OF)
+};
+
 export const VALIDATION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   validate_plan: objectSchema(PLAN_ID, ["planId"])
 };

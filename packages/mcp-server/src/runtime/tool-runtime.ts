@@ -66,6 +66,17 @@ export class JmxplsRuntime {
         case "add_smtp_sampler": return this.applySingleOperation(input, addSmtpSamplerOperation(input));
         case "add_jsr223_sampler": return this.applySingleOperation(input, addJsr223SamplerOperation(input));
         case "add_debug_sampler": return this.applySingleOperation(input, addDebugSamplerOperation(input));
+        case "add_constant_timer": return this.applySingleOperation(input, addConstantTimerOperation(input));
+        case "add_random_timer": return this.applySingleOperation(input, addRandomTimerOperation(input));
+        case "add_sync_timer": return this.applySingleOperation(input, addSyncTimerOperation(input));
+        case "add_throughput_timer": return this.applySingleOperation(input, addThroughputTimerOperation(input));
+        case "add_jsr223_timer": return this.applySingleOperation(input, addJsr223TimerOperation(input));
+        case "add_response_assertion": return this.applySingleOperation(input, addResponseAssertionOperation(input));
+        case "add_json_assertion": return this.applySingleOperation(input, addJsonAssertionOperation(input));
+        case "add_xpath_assertion": return this.applySingleOperation(input, addXPathAssertionOperation(input));
+        case "add_duration_assertion": return this.applySingleOperation(input, addDurationAssertionOperation(input));
+        case "add_size_assertion": return this.applySingleOperation(input, addSizeAssertionOperation(input));
+        case "add_jsr223_assertion": return this.applySingleOperation(input, addJsr223AssertionOperation(input));
         case "add_node": return this.applySingleOperation(input, addNodeOperation(input));
         case "update_node_field": return this.applySingleOperation(input, updateFieldOperation(input));
         case "delete_node": return this.applySingleOperation(input, deleteNodeOperation(input));
@@ -300,6 +311,56 @@ function addDebugSamplerOperation(input: ToolCallInput): SemanticPatchOperation 
   return typedAddOperation(input, "DebugSampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Debug Sampler", enabled: optionalBoolean(input, "enabled") ?? true, displayJMeterVariables: optionalBoolean(input, "displayJMeterVariables") ?? true, displayJMeterProperties: optionalBoolean(input, "displayJMeterProperties") ?? false, displaySystemProperties: optionalBoolean(input, "displaySystemProperties") ?? false }));
 }
 
+function addConstantTimerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "ConstantTimer", "ConstantTimerGui", compactFields({ name: optionalString(input, "name") ?? "Constant Timer", enabled: optionalBoolean(input, "enabled") ?? true, "ConstantTimer.delay": optionalScalar(input, "delayMs") ?? 300 }));
+}
+
+function addRandomTimerOperation(input: ToolCallInput): SemanticPatchOperation {
+  const distribution = optionalString(input, "distribution") ?? "uniform";
+  const timer = distribution === "gaussian" ? { type: "GaussianRandomTimer", gui: "GaussianRandomTimerGui", name: "Gaussian Random Timer" } : distribution === "poisson" ? { type: "PoissonRandomTimer", gui: "PoissonRandomTimerGui", name: "Poisson Random Timer" } : { type: "UniformRandomTimer", gui: "UniformRandomTimerGui", name: "Uniform Random Timer" };
+  return typedAddOperation(input, timer.type, timer.gui, compactFields({ name: optionalString(input, "name") ?? timer.name, enabled: optionalBoolean(input, "enabled") ?? true, "ConstantTimer.delay": optionalScalar(input, "delayMs") ?? 300, "RandomTimer.range": optionalScalar(input, "rangeMs"), "RandomTimer.deviation": optionalScalar(input, "deviationMs"), "RandomTimer.lambda": optionalScalar(input, "lambdaMs") }));
+}
+
+function addSyncTimerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "SyncTimer", "SyncTimerGui", compactFields({ name: optionalString(input, "name") ?? "Synchronizing Timer", enabled: optionalBoolean(input, "enabled") ?? true, groupSize: optionalScalar(input, "groupSize"), timeoutInMs: optionalScalar(input, "timeoutMs") ?? 0 }));
+}
+
+function addThroughputTimerOperation(input: ToolCallInput): SemanticPatchOperation {
+  if (optionalBoolean(input, "precise") === true) {
+    return typedAddOperation(input, "PreciseThroughputTimer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Precise Throughput Timer", enabled: optionalBoolean(input, "enabled") ?? true, throughput: optionalScalar(input, "targetThroughput"), throughputPeriod: optionalScalar(input, "throughputPeriod") ?? 60, duration: optionalScalar(input, "durationSeconds"), batchSize: optionalScalar(input, "batchSize"), batchThreadDelay: optionalScalar(input, "batchThreadDelay") }));
+  }
+  return typedAddOperation(input, "ConstantThroughputTimer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Constant Throughput Timer", enabled: optionalBoolean(input, "enabled") ?? true, throughput: optionalScalar(input, "targetThroughput"), calcMode: optionalScalar(input, "calcMode") ?? 1 }));
+}
+
+function addJsr223TimerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JSR223Timer", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Timer", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters"), cacheKey: optionalString(input, "cacheKey") }));
+}
+
+function addResponseAssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "ResponseAssertion", "AssertionGui", compactFields({ name: optionalString(input, "name") ?? "Response Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "Assertion.test_field": optionalString(input, "field") ?? "Assertion.response_data", "Assertion.test_type": responseAssertionType(optionalString(input, "matchType") ?? "contains"), "Assertion.test_strings": jsonField(patternsInput(input)), "Assertion.invert": optionalBoolean(input, "invert") }));
+}
+
+function addJsonAssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JSONPathAssertion", "JSONPathAssertionGui", compactFields({ name: optionalString(input, "name") ?? "JSON Assertion", enabled: optionalBoolean(input, "enabled") ?? true, JSON_PATH: requiredString(input, "jsonPath"), EXPECTED_VALUE: optionalString(input, "expectedValue"), JSONVALIDATION: optionalBoolean(input, "validateJson") ?? true, EXPECT_NULL: optionalBoolean(input, "expectNull") ?? false, INVERT: optionalBoolean(input, "invert") ?? false, ISREGEX: optionalBoolean(input, "regex") ?? true }));
+}
+
+function addXPathAssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  const xpath2 = optionalBoolean(input, "xpath2") ?? false;
+  return typedAddOperation(input, xpath2 ? "XPath2Assertion" : "XPathAssertion", xpath2 ? "XPath2Panel" : "XPathAssertionGui", compactFields({ name: optionalString(input, "name") ?? "XPath Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "XPath.xpath": requiredString(input, "xpath"), "XPath.validate": optionalBoolean(input, "validateXml") ?? false, "XPath.whitespace": optionalBoolean(input, "whitespace") ?? false, "XPath.tolerant": optionalBoolean(input, "tolerant") ?? false, "XPath.negate": optionalBoolean(input, "invert") ?? false }));
+}
+
+function addDurationAssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "DurationAssertion", "DurationAssertionGui", compactFields({ name: optionalString(input, "name") ?? "Duration Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "DurationAssertion.duration": optionalScalar(input, "durationMs") }));
+}
+
+function addSizeAssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "SizeAssertion", "SizeAssertionGui", compactFields({ name: optionalString(input, "name") ?? "Size Assertion", enabled: optionalBoolean(input, "enabled") ?? true, "SizeAssertion.size": optionalScalar(input, "sizeBytes"), "SizeAssertion.operator": optionalString(input, "operator") ?? "=" }));
+}
+
+function addJsr223AssertionOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JSR223Assertion", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Assertion", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters") }));
+}
+
 function httpTargetFields(input: ToolCallInput, defaultName: string): Record<string, unknown> {
   const fields: Record<string, unknown> = { name: optionalString(input, "name") ?? defaultName, enabled: optionalBoolean(input, "enabled") ?? true };
   setIfPresent(fields, "HTTPSampler.protocol", optionalString(input, "protocol"));
@@ -345,3 +406,20 @@ function objectInput(input: ToolCallInput, key: string): Record<string, unknown>
 function setIfPresent(target: Record<string, unknown>, key: string, value: unknown): void { if (value !== undefined) target[key] = value; }
 function compactFields(fields: Record<string, unknown>): Record<string, unknown> { return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)); }
 function jsonField(value: unknown): string { return JSON.stringify(value); }
+
+function patternsInput(input: ToolCallInput): string[] {
+  if (Array.isArray(input.patterns)) {
+    return input.patterns.filter((pattern): pattern is string => typeof pattern === "string" && pattern.length > 0);
+  }
+  return [requiredString(input, "pattern")];
+}
+
+function responseAssertionType(matchType: string): string {
+  switch (matchType) {
+    case "matches": return "1";
+    case "equals": return "8";
+    case "substring": return "16";
+    case "contains":
+    default: return "2";
+  }
+}
