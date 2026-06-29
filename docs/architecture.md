@@ -17,3 +17,9 @@ Resources are read-only views over runtime state. Plan resources expose summarie
 ## Execution Boundary
 
 Execution tools currently prepare allowlisted JMeter CLI commands and record planned runs. JTL analysis tools parse CSV result files directly. JMeter-backed validation and actual process execution remain guarded integration points for the Java bridge/runtime execution phase.
+
+## Java Bridge Protocol
+
+The Java bridge is a line-delimited JSON stdio service. Requests include an `id`, `command`, and command-specific fields such as `path`. Responses use a common envelope with `id`, `success`, `data`, and `diagnostics`.
+
+Current bridge commands are `ping`, `environment`, `componentCatalog`, `loadJmx`, `saveJmx`, `validateJmx`, and `roundTripJmx`. The JMeter commands still return guarded placeholder data until a configured JMeter runtime is wired into the bridge.
