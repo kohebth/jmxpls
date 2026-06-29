@@ -15,12 +15,16 @@ import {
 
 import { JmxplsRuntime as BaseRuntime, type ToolCallInput, type ToolCallResult } from "./tool-runtime.js";
 
+type RawNodeView = { nodeId: string; rawRef: string; fields: Record<string, unknown> };
+
 export class JmxplsRuntime extends BaseRuntime {
   private readonly runs = new RunManager();
 
   override async callTool(name: string, input: ToolCallInput = {}): Promise<ToolCallResult> {
-    const result = await this.callExecutionTool(name, input);
-    return result ?? super.callTool(name, input);
+    const executionResult = await this.callExecutionTool(name, input);
+    if (executionResult) return executionResult;
+    const rawResult = await this.callRawTool(name, input);
+    return rawResult ?? super.callTool(name, input);
   }
 
   override readResource(uri: string): ToolCallResult {
@@ -62,6 +66,46 @@ export class JmxplsRuntime extends BaseRuntime {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown execution tool error" };
     }
+  }
+
+  private async callRawTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
+    try {
+      switch (name) {
+        case "get_raw_element": return await this.getRawElement(input);
+        case "get_raw_properties": return await this.getRawProperties(input);
+        case "add_raw_element": return await super.callTool("add_node", rawAddInput(input));
+        case "update_raw_property": return await super.callTool("update_node_field", rawUpdateInput(input));
+        case "replace_raw_element": return await this.replaceRawElement(input);
+        case "validate_raw_patch": return validateRawPatch(input);
+        case "generate_raw_template": return generateRawTemplate(input);
+        default: return undefined;
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Unknown raw tool error" };
+    }
+  }
+
+  private async getRawElement(input: ToolCallInput): Promise<ToolCallResult> {
+    const result = await super.callTool("get_node", { planId: requiredString(input, "planId"), nodeId: requiredString(input, "nodeId") });
+    if (!result.success || !isRawNodeView(result.data)) {
+      return result.success ? { success: false, error: "Node was not found or is not a semantic node." } : result;
+    }
+    return { success: true, data: result.data };
+  }
+
+  private async getRawProperties(input: ToolCallInput): Promise<ToolCallResult> {
+    const result = await this.getRawElement(input);
+    if (!result.success || !isRawNodeView(result.data)) {
+      return result;
+    }
+    return { success: true, data: { nodeId: result.data.nodeId, rawRef: result.data.rawRef, fields: result.data.fields } };
+  }
+
+  private async replaceRawElement(input: ToolCallInput): Promise<ToolCallResult> {
+    const nodeId = requiredString(input, "nodeId");
+    const fields = objectInput(input, "fields");
+    const operations = Object.entries(fields).map(([fieldPath, value]) => ({ op: "updateField", nodeId, fieldPath, value }));
+    return await super.callTool("apply_semantic_patch", { planId: requiredString(input, "planId"), operations, ...patchFlags(input) });
   }
 
   private runJMeter(input: ToolCallInput): ToolCallResult {
@@ -135,6 +179,26 @@ async function checkJtlSla(input: ToolCallInput): Promise<ToolCallResult> {
   return { success: true, data: { path, thresholds, result: checkSla(samples, thresholds) } };
 }
 
+function rawAddInput(input: ToolCallInput): ToolCallInput {
+  return { planId: requiredString(input, "planId"), parentNodeId: optionalString(input, "parentNodeId") ?? optionalString(input, "parentId"), nodeType: optionalString(input, "nodeType") ?? optionalString(input, "type"), fields: objectInput(input, "fields"), ...patchFlags(input) };
+}
+
+function rawUpdateInput(input: ToolCallInput): ToolCallInput {
+  return { planId: requiredString(input, "planId"), nodeId: requiredString(input, "nodeId"), fieldPath: optionalString(input, "propertyPath") ?? optionalString(input, "property") ?? optionalString(input, "fieldPath"), value: input.value, ...patchFlags(input) };
+}
+
+function validateRawPatch(input: ToolCallInput): ToolCallResult {
+  const operations = Array.isArray(input.operations) ? input.operations : isObject(input.patch) && Array.isArray(input.patch.operations) ? input.patch.operations : [];
+  const diagnostics = operations.flatMap((operation, index) => isObject(operation) && typeof operation.op === "string" ? [] : [{ code: "JMX_RAW_PATCH_INVALID_OPERATION", severity: "error", message: `Operation ${index} must be an object with an op string.` }]);
+  return { success: true, data: { valid: diagnostics.length === 0, operationCount: operations.length, diagnostics } };
+}
+
+function generateRawTemplate(input: ToolCallInput): ToolCallResult {
+  const nodeType = optionalString(input, "nodeType") ?? optionalString(input, "type") ?? requiredString(input, "nodeType");
+  const fields = { name: optionalString(input, "name") ?? nodeType, enabled: input.enabled !== false, ...(optionalString(input, "guiClass") ? { guiClass: optionalString(input, "guiClass") } : {}), ...objectInput(input, "fields") };
+  return { success: true, data: { nodeType, fields } };
+}
+
 function assertAllowedCommand(command: JMeterCommand): void {
   for (const arg of [command.executable, ...command.args]) {
     if (!isAllowedJMeterArg(arg)) {
@@ -177,6 +241,23 @@ function optionalString(input: ToolCallInput, key: string): string | undefined {
 function optionalNumber(input: ToolCallInput, key: string): number | undefined {
   const value = input[key];
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function objectInput(input: ToolCallInput, key: string): Record<string, unknown> {
+  const value = input[key];
+  return isObject(value) ? value : {};
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isRawNodeView(value: unknown): value is RawNodeView {
+  return isObject(value) && typeof value.nodeId === "string" && typeof value.rawRef === "string" && isObject(value.fields);
+}
+
+function patchFlags(input: ToolCallInput): ToolCallInput {
+  return { ...(typeof input.dryRun === "boolean" ? { dryRun: input.dryRun } : {}), ...(typeof input.validate === "boolean" ? { validate: input.validate } : {}) };
 }
 
 function compactThresholds(values: Record<keyof SlaThresholds, number | undefined>): SlaThresholds {
