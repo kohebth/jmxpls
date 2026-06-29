@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -65,6 +65,47 @@ describe("JmxplsRuntime", () => {
         delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
       } else {
         process.env.JMXPLS_JAVA_BRIDGE_JAR = previousJar;
+      }
+    }
+  });
+
+  it("validates a JMX path through a configured bridge process", async () => {
+    const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
+    const previousCommand = process.env.JMXPLS_JAVA_COMMAND;
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-bridge-"));
+    const scriptPath = join(dir, "bridge-stub.mjs");
+    writeFileSync(scriptPath, [
+      "#!/usr/bin/env node",
+      "import { createInterface } from \"node:readline\";",
+      "const rl = createInterface({ input: process.stdin });",
+      "rl.on(\"line\", (line) => {",
+      "  const request = JSON.parse(line);",
+      "  process.stdout.write(JSON.stringify({ id: request.id, success: true, data: { path: request.path, valid: true }, diagnostics: [] }) + \"\\n\");",
+      "});"
+    ].join("\n"));
+    chmodSync(scriptPath, 0o755);
+
+    process.env.JMXPLS_JAVA_BRIDGE_JAR = join(dir, "bridge.jar");
+    process.env.JMXPLS_JAVA_COMMAND = scriptPath;
+    try {
+      const runtime = new JmxplsRuntime();
+      const result = await runtime.callTool("validate_with_jmeter", { path: "plan.jmx", mode: "load" });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { jmeterBacked: boolean }).jmeterBacked).toBe(true);
+      expect((result.data as { valid: boolean }).valid).toBe(true);
+      expect((result.data as { path: string }).path).toBe("plan.jmx");
+      expect((result.data as { mode: string }).mode).toBe("load");
+    } finally {
+      if (previousJar === undefined) {
+        delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
+      } else {
+        process.env.JMXPLS_JAVA_BRIDGE_JAR = previousJar;
+      }
+      if (previousCommand === undefined) {
+        delete process.env.JMXPLS_JAVA_COMMAND;
+      } else {
+        process.env.JMXPLS_JAVA_COMMAND = previousCommand;
       }
     }
   });
