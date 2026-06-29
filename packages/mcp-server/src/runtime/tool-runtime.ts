@@ -59,6 +59,13 @@ export class JmxplsRuntime {
         case "add_random_variable": return this.applySingleOperation(input, addRandomVariableOperation(input));
         case "add_jdbc_data_source": return this.applySingleOperation(input, addJdbcDataSourceOperation(input));
         case "convert_hardcoded_host_to_variable": return this.convertHardcodedHostToVariable(input);
+        case "add_jdbc_sampler": return this.applySingleOperation(input, addJdbcSamplerOperation(input));
+        case "add_ftp_sampler": return this.applySingleOperation(input, addFtpSamplerOperation(input));
+        case "add_tcp_sampler": return this.applySingleOperation(input, addTcpSamplerOperation(input));
+        case "add_jms_sampler": return this.applySingleOperation(input, addJmsSamplerOperation(input));
+        case "add_smtp_sampler": return this.applySingleOperation(input, addSmtpSamplerOperation(input));
+        case "add_jsr223_sampler": return this.applySingleOperation(input, addJsr223SamplerOperation(input));
+        case "add_debug_sampler": return this.applySingleOperation(input, addDebugSamplerOperation(input));
         case "add_node": return this.applySingleOperation(input, addNodeOperation(input));
         case "update_node_field": return this.applySingleOperation(input, updateFieldOperation(input));
         case "delete_node": return this.applySingleOperation(input, deleteNodeOperation(input));
@@ -263,6 +270,34 @@ function addRandomVariableOperation(input: ToolCallInput): SemanticPatchOperatio
 
 function addJdbcDataSourceOperation(input: ToolCallInput): SemanticPatchOperation {
   return typedAddOperation(input, "JDBCDataSource", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JDBC Connection Configuration", enabled: optionalBoolean(input, "enabled") ?? true, dataSource: requiredString(input, "dataSource"), dbUrl: optionalString(input, "dbUrl"), driver: optionalString(input, "driver"), username: optionalString(input, "username"), password: optionalString(input, "password") }));
+}
+
+function addJdbcSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JDBCSampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JDBC Request", enabled: optionalBoolean(input, "enabled") ?? true, dataSource: requiredString(input, "dataSource"), query: requiredString(input, "query"), queryType: optionalString(input, "queryType") ?? "Select Statement", queryArguments: optionalString(input, "parameters"), variableNames: Array.isArray(input.variableNames) ? input.variableNames.join(",") : undefined, resultVariable: optionalString(input, "resultVariable") }));
+}
+
+function addFtpSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "FTPSampler", "FtpTestSamplerGui", compactFields({ name: optionalString(input, "name") ?? "FTP Request", enabled: optionalBoolean(input, "enabled") ?? true, "FTPSampler.server": requiredString(input, "server"), "FTPSampler.remoteFile": requiredString(input, "remoteFile"), "FTPSampler.localFile": optionalString(input, "localFile"), "FTPSampler.action": optionalString(input, "action") ?? "get", "FTPSampler.binaryMode": optionalBoolean(input, "binaryMode") }));
+}
+
+function addTcpSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "TCPSampler", "TCPSamplerGui", compactFields({ name: optionalString(input, "name") ?? "TCP Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "TCPSampler.server": requiredString(input, "server"), "TCPSampler.port": optionalScalar(input, "port"), "TCPSampler.text": optionalString(input, "text"), "TCPSampler.classname": optionalString(input, "classname"), "TCPSampler.timeout": optionalScalar(input, "timeout") }));
+}
+
+function addJmsSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JMSSampler", "JmsSamplerGui", compactFields({ name: optionalString(input, "name") ?? "JMS Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "JMSSampler.destination": requiredString(input, "destination"), "JMSSampler.message": optionalString(input, "message"), "JMSSampler.providerUrl": optionalString(input, "providerUrl") }));
+}
+
+function addSmtpSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "SmtpSampler", "SmtpSamplerGui", compactFields({ name: optionalString(input, "name") ?? "SMTP Sampler", enabled: optionalBoolean(input, "enabled") ?? true, "SMTPSampler.server": requiredString(input, "server"), "SMTPSampler.receiver": requiredString(input, "recipient"), "SMTPSampler.sender": optionalString(input, "sender"), "SMTPSampler.subject": optionalString(input, "subject"), "SMTPSampler.message": optionalString(input, "body") }));
+}
+
+function addJsr223SamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "JSR223Sampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "JSR223 Sampler", enabled: optionalBoolean(input, "enabled") ?? true, scriptLanguage: optionalString(input, "language") ?? "groovy", script: optionalString(input, "script"), filename: optionalString(input, "filename"), parameters: optionalString(input, "parameters") }));
+}
+
+function addDebugSamplerOperation(input: ToolCallInput): SemanticPatchOperation {
+  return typedAddOperation(input, "DebugSampler", "TestBeanGUI", compactFields({ name: optionalString(input, "name") ?? "Debug Sampler", enabled: optionalBoolean(input, "enabled") ?? true, displayJMeterVariables: optionalBoolean(input, "displayJMeterVariables") ?? true, displayJMeterProperties: optionalBoolean(input, "displayJMeterProperties") ?? false, displaySystemProperties: optionalBoolean(input, "displaySystemProperties") ?? false }));
 }
 
 function httpTargetFields(input: ToolCallInput, defaultName: string): Record<string, unknown> {

@@ -26,6 +26,7 @@ const PLAN_LANGUAGE_OPTIONS = {
 };
 const HTTP_TARGET_FIELDS = { name: NON_EMPTY_STRING, protocol: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, port: STRING_OR_NUMBER, path: NON_EMPTY_STRING };
 const POSITION_AND_FLAGS = { enabled: BOOLEAN, index: INTEGER, ...PATCH_FLAGS };
+const TYPED_ADD_BASE = { ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, ...POSITION_AND_FLAGS };
 
 export const SESSION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   open_plan: objectSchema({ path: NON_EMPTY_STRING }, ["path"]),
@@ -83,6 +84,16 @@ export const DATA_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   add_random_variable: objectSchema({ ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, variableName: NON_EMPTY_STRING, minimumValue: STRING_OR_NUMBER, maximumValue: STRING_OR_NUMBER, outputFormat: NON_EMPTY_STRING, perThread: BOOLEAN, ...POSITION_AND_FLAGS }, ["planId", "variableName"], PARENT_ONE_OF),
   add_jdbc_data_source: objectSchema({ ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, dataSource: NON_EMPTY_STRING, dbUrl: NON_EMPTY_STRING, driver: NON_EMPTY_STRING, username: NON_EMPTY_STRING, password: NON_EMPTY_STRING, ...POSITION_AND_FLAGS }, ["planId", "dataSource"], PARENT_ONE_OF),
   convert_hardcoded_host_to_variable: objectSchema({ ...PLAN_ID, host: NON_EMPTY_STRING, variableName: NON_EMPTY_STRING, value: NON_EMPTY_STRING, dryRun: BOOLEAN, validate: BOOLEAN }, ["planId", "host", "variableName"])
+};
+
+export const SAMPLER_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
+  add_jdbc_sampler: objectSchema({ ...TYPED_ADD_BASE, dataSource: NON_EMPTY_STRING, query: NON_EMPTY_STRING, queryType: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING, variableNames: ARRAY, resultVariable: NON_EMPTY_STRING }, ["planId", "dataSource", "query"], PARENT_ONE_OF),
+  add_ftp_sampler: objectSchema({ ...TYPED_ADD_BASE, server: NON_EMPTY_STRING, remoteFile: NON_EMPTY_STRING, localFile: NON_EMPTY_STRING, action: NON_EMPTY_STRING, binaryMode: BOOLEAN }, ["planId", "server", "remoteFile"], PARENT_ONE_OF),
+  add_tcp_sampler: objectSchema({ ...TYPED_ADD_BASE, server: NON_EMPTY_STRING, port: STRING_OR_NUMBER, text: NON_EMPTY_STRING, classname: NON_EMPTY_STRING, timeout: STRING_OR_NUMBER }, ["planId", "server", "port"], PARENT_ONE_OF),
+  add_jms_sampler: objectSchema({ ...TYPED_ADD_BASE, destination: NON_EMPTY_STRING, message: NON_EMPTY_STRING, providerUrl: NON_EMPTY_STRING }, ["planId", "destination"], PARENT_ONE_OF),
+  add_smtp_sampler: objectSchema({ ...TYPED_ADD_BASE, server: NON_EMPTY_STRING, recipient: NON_EMPTY_STRING, sender: NON_EMPTY_STRING, subject: NON_EMPTY_STRING, body: NON_EMPTY_STRING }, ["planId", "server", "recipient"], PARENT_ONE_OF),
+  add_jsr223_sampler: objectSchema({ ...TYPED_ADD_BASE, language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING }, ["planId"], PARENT_ONE_OF),
+  add_debug_sampler: objectSchema({ ...TYPED_ADD_BASE, displayJMeterVariables: BOOLEAN, displayJMeterProperties: BOOLEAN, displaySystemProperties: BOOLEAN }, ["planId"], PARENT_ONE_OF)
 };
 
 export const VALIDATION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
