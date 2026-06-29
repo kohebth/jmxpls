@@ -24,6 +24,17 @@ describe("JmxplsRuntime", () => {
 
     const tree = await runtime.callTool("list_tree", { planId });
     const nodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+    const raw = await runtime.callTool("get_raw_element", { planId, nodeId });
+    expect((raw.data as { rawRef: string }).rawRef).toContain("raw://");
+    const rawProperties = await runtime.callTool("get_raw_properties", { planId, nodeId });
+    expect(rawProperties.success).toBe(true);
+    const rawTemplate = await runtime.callTool("generate_raw_template", { nodeType: "kg.apc.CustomElement", guiClass: "CustomGui" });
+    expect((rawTemplate.data as { fields: { guiClass: string } }).fields.guiClass).toBe("CustomGui");
+    const rawPatch = await runtime.callTool("validate_raw_patch", { operations: [{ op: "updateField", nodeId, fieldPath: "name", value: "raw" }] });
+    expect((rawPatch.data as { valid: boolean }).valid).toBe(true);
+    const rawUpdate = await runtime.callTool("update_raw_property", { planId, nodeId, propertyPath: "name", value: "Dry Run Raw Name", dryRun: true });
+    expect(rawUpdate.success).toBe(true);
+
     const patched = await runtime.callTool("apply_semantic_patch", {
       planId,
       patch: { operations: [{ op: "setEnabled", nodeId, enabled: false }] }
