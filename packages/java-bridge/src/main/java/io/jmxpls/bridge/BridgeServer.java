@@ -6,6 +6,7 @@ import io.jmxpls.bridge.jmeter.JmxLoadCommand;
 import io.jmxpls.bridge.jmeter.JmxSaveCommand;
 import io.jmxpls.bridge.jmeter.JmxValidateCommand;
 import io.jmxpls.bridge.jmeter.RoundTripCommand;
+import io.jmxpls.bridge.protocol.BridgeRequest;
 import io.jmxpls.bridge.protocol.BridgeResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -32,19 +33,18 @@ public final class BridgeServer {
     }
 
     String handle(String requestJson) {
-        String id = extractString(requestJson, "id", "unknown");
-        String command = extractString(requestJson, "command", "unknown");
-        String path = extractString(requestJson, "path", "");
+        BridgeRequest request = BridgeRequest.parse(requestJson);
+        String path = request.stringField("path", "");
 
-        return switch (command) {
-            case "ping" -> success(id, "{\"pong\":true}");
-            case "environment" -> success(id, JMeterBootstrap.environmentJson());
-            case "componentCatalog" -> success(id, new ComponentCatalogCommand().execute());
-            case "loadJmx" -> success(id, new JmxLoadCommand().execute(path));
-            case "saveJmx" -> success(id, new JmxSaveCommand().execute(path));
-            case "validateJmx" -> success(id, new JmxValidateCommand().execute(path));
-            case "roundTripJmx" -> success(id, new RoundTripCommand().execute(path));
-            default -> failure(id, "JMX_BRIDGE_UNKNOWN_COMMAND", "Unknown bridge command: " + command);
+        return switch (request.command()) {
+            case "ping" -> success(request.id(), "{\"pong\":true}");
+            case "environment" -> success(request.id(), JMeterBootstrap.environmentJson());
+            case "componentCatalog" -> success(request.id(), new ComponentCatalogCommand().execute());
+            case "loadJmx" -> success(request.id(), new JmxLoadCommand().execute(path));
+            case "saveJmx" -> success(request.id(), new JmxSaveCommand().execute(path));
+            case "validateJmx" -> success(request.id(), new JmxValidateCommand().execute(path));
+            case "roundTripJmx" -> success(request.id(), new RoundTripCommand().execute(path));
+            default -> failure(request.id(), "JMX_BRIDGE_UNKNOWN_COMMAND", "Unknown bridge command: " + request.command());
         };
     }
 
@@ -54,20 +54,5 @@ public final class BridgeServer {
 
     private static String failure(String id, String code, String message) {
         return BridgeResponse.failure(id, code, message).toJson();
-    }
-
-    private static String extractString(String json, String field, String fallback) {
-        String needle = "\"" + field + "\"";
-        int fieldIndex = json.indexOf(needle);
-        if (fieldIndex < 0) {
-            return fallback;
-        }
-        int colon = json.indexOf(':', fieldIndex + needle.length());
-        int start = json.indexOf('"', colon + 1);
-        int end = json.indexOf('"', start + 1);
-        if (colon < 0 || start < 0 || end < 0) {
-            return fallback;
-        }
-        return json.substring(start + 1, end);
     }
 }
