@@ -38,7 +38,7 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(planPath, "utf8")).toContain('enabled="false"');
   });
 
-  it("plans JMeter runs and analyzes JTL files", async () => {
+  it("plans JMeter runs, exposes resources, and analyzes JTL files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-exec-"));
     const planPath = join(dir, "plan.jmx");
     const jtlPath = join(dir, "results.jtl");
@@ -52,6 +52,13 @@ describe("JmxplsRuntime", () => {
 
     const status = await runtime.callTool("get_run_status", { runId });
     expect((status.data as { artifacts: string[] }).artifacts).toContain(jtlPath);
+
+    const runList = runtime.readResource("jmxpls://runs");
+    expect((runList.data as Array<{ runId: string }>).some((item) => item.runId === runId)).toBe(true);
+    const logs = runtime.readResource(`jmxpls://runs/${runId}/logs`);
+    expect((logs.data as { logs: string[] }).logs[0]).toContain("Prepared JMeter command");
+    const artifacts = runtime.readResource(`jmxpls://runs/${runId}/artifacts`);
+    expect((artifacts.data as { artifacts: string[] }).artifacts).toContain(jtlPath);
 
     const analysis = await runtime.callTool("analyze_jtl", { jtlPath });
     expect(analysis.success).toBe(true);
