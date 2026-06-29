@@ -7,6 +7,25 @@ import type { ToolCallInput, ToolCallResult } from "./tool-runtime.js";
 export class CatalogToolRuntime {
   private catalog = loadBuiltInCatalog();
 
+  readResource(uri: string): ToolCallResult | undefined {
+    if (uri === "jmxpls://catalog") {
+      return { success: true, data: this.catalog };
+    }
+    if (uri === "jmxpls://catalog/summary") {
+      return { success: true, data: catalogSummary(this.catalog) };
+    }
+    if (uri === "jmxpls://catalog/types") {
+      return { success: true, data: listComponents(this.catalog) };
+    }
+    const match = /^jmxpls:\/\/catalog\/types\/([^/]+)$/.exec(uri);
+    if (!match) {
+      return undefined;
+    }
+    const type = decodeURIComponent(match[1] ?? "");
+    const descriptor = this.findDescriptor(type);
+    return descriptor ? { success: true, data: descriptor } : { success: false, error: `Unknown component type: ${type}` };
+  }
+
   async callTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
     try {
       switch (name) {
@@ -41,9 +60,7 @@ export class CatalogToolRuntime {
 
   private listTypes(input: ToolCallInput): ToolCallResult {
     const role = optionalString(input, "role");
-    const components = this.catalog.components
-      .filter((component) => role ? component.role === role : true)
-      .map((component) => ({ type: component.type, role: component.role, displayName: component.displayName }));
+    const components = listComponents(this.catalog).components.filter((component) => role ? component.role === role : true);
     return { success: true, data: { count: components.length, components } };
   }
 
@@ -79,6 +96,11 @@ function catalogSummary(catalog: ComponentCatalog): Record<string, unknown> {
     return counts;
   }, {});
   return { version: catalog.version, source: catalog.source, count: catalog.components.length, roles };
+}
+
+function listComponents(catalog: ComponentCatalog): { count: number; components: Array<{ type: string; role: string; displayName: string }> } {
+  const components = catalog.components.map((component) => ({ type: component.type, role: component.role, displayName: component.displayName }));
+  return { count: components.length, components };
 }
 
 function defaultFields(descriptor: ComponentDescriptor): Record<string, unknown> {

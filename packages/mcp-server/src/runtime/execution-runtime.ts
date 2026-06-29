@@ -36,6 +36,10 @@ export class JmxplsRuntime extends BaseRuntime {
   }
 
   override readResource(uri: string): ToolCallResult {
+    const catalogResult = this.catalogTools.readResource(uri);
+    if (catalogResult) {
+      return catalogResult;
+    }
     if (uri === "jmxpls://runs") {
       return { success: true, data: this.runs.list() };
     }
