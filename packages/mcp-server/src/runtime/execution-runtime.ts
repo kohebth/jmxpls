@@ -13,18 +13,22 @@ import {
   type SlaThresholds
 } from "@jmxpls/core";
 
+import { CatalogToolRuntime } from "./catalog-runtime.js";
 import { JmxplsRuntime as BaseRuntime, type ToolCallInput, type ToolCallResult } from "./tool-runtime.js";
 
 type RawNodeView = { nodeId: string; rawRef: string; fields: Record<string, unknown> };
 
 export class JmxplsRuntime extends BaseRuntime {
   private readonly runs = new RunManager();
+  private readonly catalogTools = new CatalogToolRuntime();
 
   override async callTool(name: string, input: ToolCallInput = {}): Promise<ToolCallResult> {
     const executionResult = await this.callExecutionTool(name, input);
     if (executionResult) return executionResult;
     const rawResult = await this.callRawTool(name, input);
-    return rawResult ?? super.callTool(name, input);
+    if (rawResult) return rawResult;
+    const catalogResult = await this.catalogTools.callTool(name, input);
+    return catalogResult ?? super.callTool(name, input);
   }
 
   override readResource(uri: string): ToolCallResult {
