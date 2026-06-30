@@ -63,5 +63,13 @@ function formatScalar(value: unknown): string {
     return JSON.stringify(value);
   }
 
-  return String(value);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return `${value}`;
+  }
+
+  if (value === null) {
+    return "null";
+  }
+
+  throw new Error(`Unsupported Plan Language scalar value of type "${typeof value}"`);
 }
