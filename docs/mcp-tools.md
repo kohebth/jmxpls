@@ -98,6 +98,11 @@ Template tools expose built-in semantic patch templates:
 - `http_api_baseline` creates a thread group with HTTP defaults, a health-check request, and a summary listener.
 - `http_api_login_bearer_token` adds a login request, JSON token extractor, authorization header manager, and authenticated sample request.
 - `csv_driven_login_flow` adds a CSV data set for `username,password`, a login request, and a response assertion.
+- `blank_test_plan` adds a baseline thread group and summary report.
+- `crud_api_flow` adds create/read/update/delete requests for an HTTP resource.
+- `jmeter_ci_artifact_profile` and `backend_listener_influxdb_profile` add a scheduler plus backend listener + summary report.
+- `jdbc_query_test` adds JDBC datasource + sampler and a result assertion.
+- `jms_point_to_point_test` and `tcp_smoke_test` add JMS and TCP smoke test samples.
 - `constant_load_profile`, `ramp_load_profile`, `spike_load_profile`, `stress_load_profile`, and `soak_load_profile` create complete HTTP starter flows with scheduled thread groups and profile-specific timers.
 
 - `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.

@@ -215,6 +215,8 @@ describe("JmxplsRuntime", () => {
 
     const templates = await runtime.callTool("list_templates");
     expect((templates.data as Array<{ name: string }>).some((template) => template.name === "http_api_baseline")).toBe(true);
+    expect((templates.data as Array<{ name: string }>).some((template) => template.name === "crud_api_flow")).toBe(true);
+    expect((templates.data as Array<{ name: string }>).some((template) => template.name === "jdbc_query_test")).toBe(true);
 
     const template = await runtime.callTool("get_template", { name: "http_api_baseline" });
     expect((template.data as { patch: { operations: unknown[] } }).patch.operations).toHaveLength(4);
@@ -226,5 +228,8 @@ describe("JmxplsRuntime", () => {
 
     const alias = await runtime.callTool("create_bearer_token_flow");
     expect((alias.data as { name: string }).name).toBe("http_api_login_bearer_token");
+
+    const crudAlias = await runtime.callTool("create_crud_flow");
+    expect((crudAlias.data as { name: string }).name).toBe("crud_api_flow");
   });
 });

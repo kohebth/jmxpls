@@ -11,6 +11,13 @@ const builtInTemplateNames = [
   "http_api_baseline",
   "http_api_login_bearer_token",
   "csv_driven_login_flow",
+  "blank_test_plan",
+  "crud_api_flow",
+  "jmeter_ci_artifact_profile",
+  "backend_listener_influxdb_profile",
+  "jdbc_query_test",
+  "jms_point_to_point_test",
+  "tcp_smoke_test",
   "constant_load_profile",
   "ramp_load_profile",
   "spike_load_profile",
@@ -85,6 +92,16 @@ describe("template runtime", () => {
         expect.objectContaining({ name: "tokenVariable", type: "string" }),
         expect.objectContaining({ name: "loginPath", type: "string" }),
         expect.objectContaining({ name: "authenticatedPath", type: "string" })
+      ]),
+    );
+    const crudTemplate = await runtime.callTool("get_template", { name: "crud_api_flow" });
+    expect(crudTemplate.success).toBe(true);
+
+    const crudData = crudTemplate.data as { parameters: Array<{ name: string; type: string }> };
+    expect(crudData.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "resourceBasePath", type: "string" }),
+        expect.objectContaining({ name: "createMethod", type: "string" })
       ]),
     );
   });

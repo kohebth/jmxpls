@@ -57,6 +57,13 @@ describe("runs, IO, and templates", () => {
     const patch = registry.get("http_api_baseline")?.instantiate();
     const bearerPatch = registry.get("http_api_login_bearer_token")?.instantiate();
     const csvPatch = registry.get("csv_driven_login_flow")?.instantiate();
+    const blankPatch = registry.get("blank_test_plan")?.instantiate();
+    const crudPatch = registry.get("crud_api_flow")?.instantiate();
+    const influxPatch = registry.get("backend_listener_influxdb_profile")?.instantiate();
+    const jdbcPatch = registry.get("jdbc_query_test")?.instantiate();
+    const jmsPatch = registry.get("jms_point_to_point_test")?.instantiate();
+    const tcpPatch = registry.get("tcp_smoke_test")?.instantiate();
+    const ciPatch = registry.get("jmeter_ci_artifact_profile")?.instantiate();
 
     expect(patch?.operations).toHaveLength(4);
     expect(patch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
@@ -97,6 +104,28 @@ describe("runs, IO, and templates", () => {
       expect.objectContaining({ op: "addNode", fields: expect.objectContaining({ filename: "accounts.csv", variableNames: "email,secret" }) }),
       expect.objectContaining({ op: "addNode", nodeId: "custom-csv-request", fields: expect.objectContaining({ "HTTPSampler.postBodyRaw": "{\"username\":\"${email}\",\"password\":\"${secret}\"}" }) }),
       expect.objectContaining({ op: "addNode", parentNodeId: "custom-csv-request", fields: expect.objectContaining({ "Assertion.test_strings": "[\"204\"]" }) })
+    ]));
+    expect(blankPatch?.operations).toHaveLength(3);
+    expect(blankPatch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
+    expect(blankPatch?.operations[1]).toMatchObject({ op: "addNode", parentNodeId: "template-blank-thread-group", nodeType: "ConfigTestElement" });
+    expect(blankPatch?.operations[2]).toMatchObject({ op: "addNode", parentNodeId: "template-blank-thread-group", nodeType: "ResultCollector" });
+    expect(crudPatch?.operations).toHaveLength(7);
+    expect(crudPatch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
+    expect(crudPatch?.operations[2]).toMatchObject({ op: "addNode", nodeType: "HTTPSamplerProxy", nodeId: "template-crud-api-request-create" });
+    expect(influxPatch?.operations).toHaveLength(3);
+    expect(influxPatch?.operations[1]).toMatchObject({ op: "addNode", nodeType: "BackendListener" });
+    expect(ciPatch?.operations).toHaveLength(4);
+    expect(ciPatch?.operations[2]).toMatchObject({ op: "addNode", nodeType: "BackendListener" });
+    expect(jdbcPatch?.operations).toHaveLength(5);
+    expect(jdbcPatch?.operations[1]).toMatchObject({ op: "addNode", nodeType: "JDBCDataSource" });
+    expect(jdbcPatch?.operations[2]).toMatchObject({ op: "addNode", nodeType: "JDBCSampler" });
+    expect(jmsPatch?.operations).toHaveLength(3);
+    expect(jmsPatch?.operations[1]).toMatchObject({ op: "addNode", nodeType: "JMSSampler" });
+    expect(tcpPatch?.operations).toHaveLength(3);
+    expect(tcpPatch?.operations[1]).toMatchObject({ op: "addNode", nodeType: "TCPSampler" });
+    expect(registry.get("backend_listener_influxdb_profile")?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "influxdbUrl", type: "string" }),
+      expect.objectContaining({ name: "influxdbName", type: "string" })
     ]));
     for (const [name, timerType] of Object.entries(loadProfileTimers)) {
       const operations = registry.get(name)?.instantiate().operations;

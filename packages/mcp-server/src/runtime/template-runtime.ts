@@ -15,7 +15,7 @@ export class TemplateToolRuntime {
         case "create_login_flow":
         case "create_bearer_token_flow": return await this.instantiateNamed("http_api_login_bearer_token", input, base);
         case "create_csv_driven_flow": return await this.instantiateNamed("csv_driven_login_flow", input, base);
-        case "create_crud_flow": return await this.instantiateNamed("http_api_baseline", input, base);
+        case "create_crud_flow": return await this.instantiateNamed("crud_api_flow", input, base);
         case "prepare_plan_for_ci": return await base.callTool("disable_gui_only_listeners", input);
         case "convert_hardcoded_values_to_variables": return await convertHardcodedValues(input, base);
         default: return undefined;
