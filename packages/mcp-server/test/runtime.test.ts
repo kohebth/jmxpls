@@ -109,6 +109,13 @@ describe("JmxplsRuntime", () => {
       expect((sessionResult.data as { valid: boolean }).valid).toBe(true);
       expect((sessionResult.data as { path: string }).path).toBe(planPath);
       expect((sessionResult.data as { mode: string }).mode).toBe("loadSaveReload");
+
+      const roundTripResult = await runtime.callTool("roundtrip_validate", { planId });
+      expect(roundTripResult.success).toBe(true);
+      expect((roundTripResult.data as { jmeterBacked: boolean }).jmeterBacked).toBe(true);
+      expect((roundTripResult.data as { valid: boolean }).valid).toBe(true);
+      expect((roundTripResult.data as { path: string }).path).toBe(planPath);
+      expect((roundTripResult.data as { mode: string }).mode).toBe("loadSaveReload");
     } finally {
       if (previousJar === undefined) {
         delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
