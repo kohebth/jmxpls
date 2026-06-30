@@ -29,3 +29,23 @@ Use load-profile templates to add a complete scheduled HTTP starter flow:
 ```json
 {"name":"instantiate_template","arguments":{"name":"ramp_load_profile","planId":"<planId>","domain":"api.example.test","path":"/v2/ping","threads":75,"rampSec":600,"durationSec":1200,"targetThroughput":450,"dryRun":true,"apply":true}}
 ```
+
+Quickly scaffold a full CRUD API scenario and a JDBC smoke check:
+
+```json
+{"name":"instantiate_template","arguments":{"name":"crud_api_flow","planId":"<planId>","domain":"api.example.test","resourceBasePath":"/items","threads":5,"createBody":"{\"name\":\"new-item\"}","updateBody":"{\"name\":\"updated-item\"}","dryRun":true,"apply":true}}
+```
+
+```json
+{"name":"instantiate_template","arguments":{"name":"jdbc_query_test","planId":"<planId>","dbUrl":"jdbc:h2:mem:sample","query":"SELECT 1","dryRun":true,"apply":true}}
+```
+
+For plugin-adjacent starters, use:
+
+```json
+{"name":"instantiate_template","arguments":{"name":"jms_point_to_point_test","planId":"<planId>","destination":"test.queue","message":"hello-world","dryRun":true,"apply":true}}
+```
+
+```json
+{"name":"instantiate_template","arguments":{"name":"tcp_smoke_test","planId":"<planId>","server":"localhost","text":"ping","port":80,"dryRun":true,"apply":true}}
+```
