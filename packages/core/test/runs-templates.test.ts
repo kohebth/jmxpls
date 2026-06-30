@@ -70,9 +70,22 @@ describe("runs, IO, and templates", () => {
     expect(bearerPatch?.operations).toHaveLength(6);
     expect(bearerPatch?.operations[2]).toMatchObject({ op: "addNode", nodeId: "template-login-bearer-request", nodeType: "HTTPSamplerProxy" });
     expect(bearerPatch?.operations[3]).toMatchObject({ op: "addNode", parentNodeId: "template-login-bearer-request", nodeType: "JSONPostProcessor" });
+    expect(registry.get("http_api_login_bearer_token")?.instantiate({ idPrefix: "custom-bearer", domain: "secure.example", loginPath: "/auth/login", authenticatedPath: "/v1/me", tokenVariable: "jwt", tokenJsonPath: "$.access_token", authHeaderPrefix: "Token" }).operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ op: "addNode", nodeId: "custom-bearer-thread-group" }),
+      expect.objectContaining({ op: "addNode", nodeId: "custom-bearer-request", fields: expect.objectContaining({ "HTTPSampler.path": "/auth/login" }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-bearer-request", fields: expect.objectContaining({ "JSONPostProcessor.referenceNames": "jwt", "JSONPostProcessor.jsonPathExprs": "$.access_token" }) }),
+      expect.objectContaining({ op: "addNode", fields: expect.objectContaining({ "HeaderManager.headers": "{\"Authorization\":\"Token ${jwt}\"}" }) }),
+      expect.objectContaining({ op: "addNode", fields: expect.objectContaining({ "HTTPSampler.path": "/v1/me" }) })
+    ]));
     expect(csvPatch?.operations).toHaveLength(5);
     expect(csvPatch?.operations[1]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-thread-group", nodeType: "CSVDataSet" });
     expect(csvPatch?.operations[4]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-request", nodeType: "ResponseAssertion" });
+    expect(registry.get("csv_driven_login_flow")?.instantiate({ idPrefix: "custom-csv", csvFilename: "accounts.csv", usernameVariable: "email", passwordVariable: "secret", domain: "login.example", expectedStatus: "204" }).operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ op: "addNode", nodeId: "custom-csv-thread-group" }),
+      expect.objectContaining({ op: "addNode", fields: expect.objectContaining({ filename: "accounts.csv", variableNames: "email,secret" }) }),
+      expect.objectContaining({ op: "addNode", nodeId: "custom-csv-request", fields: expect.objectContaining({ "HTTPSampler.postBodyRaw": "{\"username\":\"${email}\",\"password\":\"${secret}\"}" }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-csv-request", fields: expect.objectContaining({ "Assertion.test_strings": "[\"204\"]" }) })
+    ]));
     for (const [name, timerType] of Object.entries(loadProfileTimers)) {
       const operations = registry.get(name)?.instantiate().operations;
       expect(operations).toHaveLength(5);

@@ -18,7 +18,29 @@ const TEMPLATE_OPTIONS = {
   rampUpSec: STRING_OR_NUMBER,
   loops: STRING_OR_NUMBER,
   threadGroupName: STRING,
-  requestName: STRING
+  requestName: STRING,
+  loginPath: STRING,
+  loginMethod: STRING,
+  loginBody: STRING,
+  loginRequestName: STRING,
+  authenticatedPath: STRING,
+  authenticatedMethod: STRING,
+  authenticatedRequestName: STRING,
+  usernameVariable: STRING,
+  passwordVariable: STRING,
+  tokenVariable: STRING,
+  tokenJsonPath: STRING,
+  tokenDefault: STRING,
+  authHeaderName: STRING,
+  authHeaderPrefix: STRING,
+  csvFilename: STRING,
+  variableNames: STRING,
+  delimiter: STRING,
+  ignoreFirstLine: BOOLEAN,
+  recycle: BOOLEAN,
+  stopThread: BOOLEAN,
+  shareMode: STRING,
+  expectedStatus: STRING
 };
 const APPLY_OPTIONS = { ...PLAN_ID, parentNodeId: STRING, apply: BOOLEAN, ...PATCH_FLAGS };
 

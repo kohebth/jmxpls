@@ -82,6 +82,7 @@ export * from "./session/revision-log.js";
 export * from "./session/session-manager.js";
 export * from "./templates/built-in.js";
 export * from "./templates/http-api.js";
+export * from "./templates/input.js";
 export * from "./templates/load-profiles.js";
 export * from "./templates/login-flow.js";
 export * from "./templates/registry.js";

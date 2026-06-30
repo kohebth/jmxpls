@@ -1,7 +1,5 @@
-import type { PlanTemplate, TemplateInput } from "./registry.js";
-
-const LOGIN_THREAD_GROUP = "template-login-bearer-thread-group";
-const LOGIN_REQUEST = "template-login-bearer-request";
+import type { PlanTemplate } from "./registry.js";
+import { numberInput, scalarInput, stringInput } from "./input.js";
 
 export const httpApiBaselineTemplate: PlanTemplate = {
   name: "http_api_baseline",
@@ -27,34 +25,28 @@ export const httpApiBaselineTemplate: PlanTemplate = {
 export const httpApiLoginBearerTokenTemplate: PlanTemplate = {
   name: "http_api_login_bearer_token",
   description: "HTTP API login flow with bearer token extraction.",
-  instantiate: () => ({
-    dryRun: true,
-    operations: [
-      { op: "addNode", parentNodeId: "root", nodeId: LOGIN_THREAD_GROUP, nodeType: "ThreadGroup", fields: { name: "Bearer Token Users", guiClass: "ThreadGroupGui", "ThreadGroup.num_threads": 10, "ThreadGroup.ramp_time": 10, "LoopController.loops": 1 } },
-      { op: "addNode", parentNodeId: LOGIN_THREAD_GROUP, nodeType: "ConfigTestElement", fields: { name: "HTTP Request Defaults", guiClass: "HttpDefaultsGui", "HTTPSampler.protocol": "https", "HTTPSampler.domain": "example.com" } },
-      { op: "addNode", parentNodeId: LOGIN_THREAD_GROUP, nodeId: LOGIN_REQUEST, nodeType: "HTTPSamplerProxy", fields: { name: "POST /login", guiClass: "HttpTestSampleGui", "HTTPSampler.method": "POST", "HTTPSampler.path": "/login", "HTTPSampler.postBodyRaw": "{\"username\":\"${username}\",\"password\":\"${password}\"}" } },
-      { op: "addNode", parentNodeId: LOGIN_REQUEST, nodeType: "JSONPostProcessor", fields: { name: "Extract bearer token", guiClass: "JSONPostProcessorGui", "JSONPostProcessor.referenceNames": "authToken", "JSONPostProcessor.jsonPathExprs": "$.token", "JSONPostProcessor.match_numbers": 1, "JSONPostProcessor.defaultValues": "TOKEN_NOT_FOUND", "JSONPostProcessor.compute_concat": false } },
-      { op: "addNode", parentNodeId: LOGIN_THREAD_GROUP, nodeType: "HeaderManager", fields: { name: "Bearer Authorization", guiClass: "HeaderPanel", "HeaderManager.headers": "{\"Authorization\":\"Bearer ${authToken}\"}" } },
-      { op: "addNode", parentNodeId: LOGIN_THREAD_GROUP, nodeType: "HTTPSamplerProxy", fields: { name: "GET /profile", guiClass: "HttpTestSampleGui", "HTTPSampler.method": "GET", "HTTPSampler.path": "/profile" } }
-    ]
-  })
-};
-
-function stringInput(input: TemplateInput, key: string, fallback: string): string {
-  const value = input[key];
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-
-function numberInput(input: TemplateInput, key: string, fallback: number): number {
-  const value = input[key];
-  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function scalarInput(input: TemplateInput, key: string): string | number | undefined {
-  const value = input[key];
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined;
+  instantiate: (input = {}) => {
+    const idPrefix = stringInput(input, "idPrefix", "template-login-bearer");
+    const threadGroupId = `${idPrefix}-thread-group`;
+    const loginRequestId = `${idPrefix}-request`;
+    const loginMethod = stringInput(input, "loginMethod", "POST");
+    const loginPath = stringInput(input, "loginPath", "/login");
+    const authenticatedMethod = stringInput(input, "authenticatedMethod", "GET");
+    const authenticatedPath = stringInput(input, "authenticatedPath", "/profile");
+    const usernameVariable = stringInput(input, "usernameVariable", "username");
+    const passwordVariable = stringInput(input, "passwordVariable", "password");
+    const tokenVariable = stringInput(input, "tokenVariable", "authToken");
+    const port = scalarInput(input, "port");
+    return {
+      dryRun: true,
+      operations: [
+        { op: "addNode", parentNodeId: "root", nodeId: threadGroupId, nodeType: "ThreadGroup", fields: { name: stringInput(input, "threadGroupName", "Bearer Token Users"), guiClass: "ThreadGroupGui", "ThreadGroup.num_threads": numberInput(input, "threads", 10), "ThreadGroup.ramp_time": numberInput(input, "rampSec", numberInput(input, "rampUpSec", 10)), "LoopController.loops": numberInput(input, "loops", 1) } },
+        { op: "addNode", parentNodeId: threadGroupId, nodeType: "ConfigTestElement", fields: { name: "HTTP Request Defaults", guiClass: "HttpDefaultsGui", "HTTPSampler.protocol": stringInput(input, "protocol", "https"), "HTTPSampler.domain": stringInput(input, "domain", "example.com"), ...(port !== undefined ? { "HTTPSampler.port": port } : {}) } },
+        { op: "addNode", parentNodeId: threadGroupId, nodeId: loginRequestId, nodeType: "HTTPSamplerProxy", fields: { name: stringInput(input, "loginRequestName", `${loginMethod} ${loginPath}`), guiClass: "HttpTestSampleGui", "HTTPSampler.method": loginMethod, "HTTPSampler.path": loginPath, "HTTPSampler.postBodyRaw": stringInput(input, "loginBody", `{"username":"\${${usernameVariable}}","password":"\${${passwordVariable}}"}`) } },
+        { op: "addNode", parentNodeId: loginRequestId, nodeType: "JSONPostProcessor", fields: { name: "Extract bearer token", guiClass: "JSONPostProcessorGui", "JSONPostProcessor.referenceNames": tokenVariable, "JSONPostProcessor.jsonPathExprs": stringInput(input, "tokenJsonPath", "$.token"), "JSONPostProcessor.match_numbers": 1, "JSONPostProcessor.defaultValues": stringInput(input, "tokenDefault", "TOKEN_NOT_FOUND"), "JSONPostProcessor.compute_concat": false } },
+        { op: "addNode", parentNodeId: threadGroupId, nodeType: "HeaderManager", fields: { name: "Bearer Authorization", guiClass: "HeaderPanel", "HeaderManager.headers": JSON.stringify({ [stringInput(input, "authHeaderName", "Authorization")]: `${stringInput(input, "authHeaderPrefix", "Bearer")} \${${tokenVariable}}` }) } },
+        { op: "addNode", parentNodeId: threadGroupId, nodeType: "HTTPSamplerProxy", fields: { name: stringInput(input, "authenticatedRequestName", `${authenticatedMethod} ${authenticatedPath}`), guiClass: "HttpTestSampleGui", "HTTPSampler.method": authenticatedMethod, "HTTPSampler.path": authenticatedPath } }
+      ]
+    };
   }
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
+};
