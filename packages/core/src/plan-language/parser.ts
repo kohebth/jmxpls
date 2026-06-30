@@ -1,4 +1,5 @@
 import { planLanguageFromJson } from "./json.js";
+import { planLanguageFromYaml } from "./yaml.js";
 import type { PlanLanguageParseResult } from "./types.js";
 
 export function parsePlanLanguage(text: string): PlanLanguageParseResult {
@@ -8,5 +9,5 @@ export function parsePlanLanguage(text: string): PlanLanguageParseResult {
     return { document: planLanguageFromJson(text), sourceFormat: "json" };
   }
 
-  throw new Error("YAML Plan Language parsing is not implemented yet; use JSON import for now.");
+  return { document: planLanguageFromYaml(text), sourceFormat: "yaml" };
 }

@@ -1,7 +1,19 @@
 import type { PlanLanguageDocument } from "./types.js";
+import { load } from "js-yaml";
 
 export function planLanguageToYaml(document: PlanLanguageDocument): string {
   return toYamlValue(document, 0);
+}
+
+export function planLanguageFromYaml(text: string): PlanLanguageDocument {
+  const parseYaml = load as (input: string) => unknown;
+  const parsed = parseYaml(text);
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Invalid YAML Plan Language document.");
+  }
+
+  return parsed as PlanLanguageDocument;
 }
 
 function toYamlValue(value: unknown, depth: number): string {
@@ -15,8 +27,18 @@ function toYamlValue(value: unknown, depth: number): string {
   }
 
   if (value && typeof value === "object") {
+    if (Array.isArray(value) && value.length === 0) {
+      return "[]\n";
+    }
+
     return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) => `${indent}${key}: ${formatYamlItem(item, depth + 1)}`)
+      .map(([key, item]) => {
+        if (Array.isArray(item) && item.length === 0) {
+          return `${indent}${key}: []\n`;
+        }
+
+        return `${indent}${key}: ${formatYamlItem(item, depth + 1)}`;
+      })
       .join("");
   }
 

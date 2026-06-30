@@ -27,6 +27,14 @@ describe("Plan Language", () => {
     expect(parsed.document.name).toBe("Minimal Plan");
   });
 
+  it("parses YAML", () => {
+    const document = projectPlanLanguage(semanticPlan(), { mode: "semantic" });
+    const parsed = parsePlanLanguage(serializePlanLanguage(document, "yaml"));
+
+    expect(parsed.sourceFormat).toBe("yaml");
+    expect(parsed.document.name).toBe("Minimal Plan");
+  });
+
   it("round-trips through JSON", () => {
     expect(roundTripPlanLanguage(semanticPlan()).equivalent).toBe(true);
   });
