@@ -45,10 +45,15 @@ describe("runs, IO, and templates", () => {
   });
 
   it("registers built-in templates", () => {
-    const patch = createBuiltInTemplateRegistry().get("http_api_baseline")?.instantiate();
+    const registry = createBuiltInTemplateRegistry();
+    const patch = registry.get("http_api_baseline")?.instantiate();
+    const bearerPatch = registry.get("http_api_login_bearer_token")?.instantiate();
 
     expect(patch?.operations).toHaveLength(4);
     expect(patch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
     expect(patch?.operations[2]).toMatchObject({ op: "addNode", parentNodeId: "template-http-api-thread-group", nodeType: "HTTPSamplerProxy" });
+    expect(bearerPatch?.operations).toHaveLength(6);
+    expect(bearerPatch?.operations[2]).toMatchObject({ op: "addNode", nodeId: "template-login-bearer-request", nodeType: "HTTPSamplerProxy" });
+    expect(bearerPatch?.operations[3]).toMatchObject({ op: "addNode", parentNodeId: "template-login-bearer-request", nodeType: "JSONPostProcessor" });
   });
 });
