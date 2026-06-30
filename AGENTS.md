@@ -19,7 +19,7 @@ The root script `corepack pnpm bridge:build` delegates to the Java bridge Gradle
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript modules with ESM imports and explicit exported types for public contracts. Keep file names descriptive and kebab-case, for example `hash-tree-parser.ts` or `canonical-patch.ts`. Prefer typed schema-driven inputs and outputs over loose objects. Java code uses package `io.jmxpls.bridge`, Java 17, and JUnit 5 tests. Preserve unknown JMeter/plugin nodes unless a tool explicitly targets them.
+Use TypeScript modules with ESM imports and explicit exported types for public contracts. Keep file names descriptive and kebab-case, for example `hash-tree-parser.ts` or `canonical-patch.ts`. Before writing code, choose the shortest implementation that preserves behavior and stays simple to read. Prefer typed schema-driven inputs and outputs over loose objects. Java code uses package `io.jmxpls.bridge`, Java 17, and JUnit 5 tests. Preserve unknown JMeter/plugin nodes unless a tool explicitly targets them.
 
 ## Testing Guidelines
 
