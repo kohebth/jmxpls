@@ -203,15 +203,26 @@ describe("JmxplsRuntime", () => {
   });
 
   it("serves and instantiates built-in templates", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-template-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
     const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+
     const templates = await runtime.callTool("list_templates");
     expect((templates.data as Array<{ name: string }>).some((template) => template.name === "http_api_baseline")).toBe(true);
 
     const template = await runtime.callTool("get_template", { name: "http_api_baseline" });
-    expect((template.data as { patch: { operations: unknown[] } }).patch.operations).toEqual([]);
+    expect((template.data as { patch: { operations: unknown[] } }).patch.operations).toHaveLength(4);
 
-    const instantiated = await runtime.callTool("instantiate_template", { name: "http_api_baseline", dryRun: true });
-    expect((instantiated.data as { patch: { dryRun: boolean } }).patch.dryRun).toBe(true);
+    const instantiated = await runtime.callTool("instantiate_template", { name: "http_api_baseline", planId, dryRun: true });
+    const patch = (instantiated.data as { patch: { dryRun: boolean; operations: Array<{ parentNodeId?: string }> } }).patch;
+    expect(patch.dryRun).toBe(true);
+    expect(patch.operations[0]?.parentNodeId).toBe(rootNodeId);
 
     const alias = await runtime.callTool("create_bearer_token_flow");
     expect((alias.data as { name: string }).name).toBe("http_api_login_bearer_token");

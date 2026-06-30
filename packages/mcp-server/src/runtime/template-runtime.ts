@@ -1,4 +1,4 @@
-import { createBuiltInTemplateRegistry, type SemanticPatch } from "@jmxpls/core";
+import { createBuiltInTemplateRegistry, type SemanticPatch, type SemanticPatchOperation } from "@jmxpls/core";
 
 import type { JmxplsRuntime as BaseRuntime, ToolCallInput, ToolCallResult } from "./tool-runtime.js";
 
@@ -44,7 +44,7 @@ export class TemplateToolRuntime {
     if (!template) {
       return { success: false, error: `Unknown template: ${name}` };
     }
-    const patch = withPatchFlags(template.instantiate(), input);
+    const patch = await retargetTemplatePatch(withPatchFlags(template.instantiate(), input), input, base);
     if (input.apply === true) {
       return await base.callTool("apply_semantic_patch", { planId: requiredString(input, "planId"), patch });
     }
@@ -57,6 +57,27 @@ async function convertHardcodedValues(input: ToolCallInput, base: BaseRuntime): 
     return await base.callTool("convert_hardcoded_host_to_variable", input);
   }
   return { success: false, error: "host and variableName are required for the current conversion implementation." };
+}
+
+async function retargetTemplatePatch(patch: SemanticPatch, input: ToolCallInput, base: BaseRuntime): Promise<SemanticPatch> {
+  const parentNodeId = optionalString(input, "parentNodeId") ?? await firstRootNodeId(input, base);
+  if (!parentNodeId) {
+    return patch;
+  }
+  return { ...patch, operations: patch.operations.map((operation) => retargetRootAdd(operation, parentNodeId)) };
+}
+
+async function firstRootNodeId(input: ToolCallInput, base: BaseRuntime): Promise<string | undefined> {
+  const planId = optionalString(input, "planId");
+  if (!planId) {
+    return undefined;
+  }
+  const result = await base.callTool("list_tree", { planId });
+  return result.success && Array.isArray(result.data) && isNode(result.data[0]) ? result.data[0].nodeId : undefined;
+}
+
+function retargetRootAdd(operation: SemanticPatchOperation, parentNodeId: string): SemanticPatchOperation {
+  return operation.op === "addNode" && operation.parentNodeId === "root" ? { ...operation, parentNodeId } : operation;
 }
 
 function withPatchFlags(patch: SemanticPatch, input: ToolCallInput): SemanticPatch {
@@ -73,4 +94,13 @@ function requiredString(input: ToolCallInput, key: string): string {
     throw new Error(`${key} is required`);
   }
   return value;
+}
+
+function optionalString(input: ToolCallInput, key: string): string | undefined {
+  const value = input[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function isNode(value: unknown): value is { nodeId: string } {
+  return value !== null && typeof value === "object" && "nodeId" in value && typeof value.nodeId === "string";
 }
