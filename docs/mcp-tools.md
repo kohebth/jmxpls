@@ -93,7 +93,12 @@ Catalog tools load, refresh, inspect, import, and export component descriptors f
 
 ## Template Tools
 
-Template tools expose built-in semantic patch templates. `http_api_baseline` creates a thread group with HTTP defaults, a health-check request, and a summary listener; other built-ins remain lightweight scaffolds until their generator phases are filled in.
+Template tools expose built-in semantic patch templates:
+
+- `http_api_baseline` creates a thread group with HTTP defaults, a health-check request, and a summary listener.
+- `http_api_login_bearer_token` adds a login request, JSON token extractor, authorization header manager, and authenticated sample request.
+- `csv_driven_login_flow` adds a CSV data set for `username,password`, a login request, and a response assertion.
+- `constant_load_profile`, `ramp_load_profile`, `spike_load_profile`, `stress_load_profile`, and `soak_load_profile` create complete HTTP starter flows with scheduled thread groups and profile-specific timers.
 
 - `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.
 - `instantiate_template` retargets top-level template operations to the opened plan root when `planId` is supplied; pass `apply: true` to call `apply_semantic_patch`.
@@ -105,4 +110,8 @@ Example:
 
 ```json
 {"name":"instantiate_template","arguments":{"name":"http_api_baseline","planId":"<planId>","dryRun":true,"apply":true}}
+```
+
+```json
+{"name":"instantiate_template","arguments":{"name":"soak_load_profile","planId":"<planId>","dryRun":true,"apply":true}}
 ```
