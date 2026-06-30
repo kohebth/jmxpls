@@ -6,6 +6,7 @@ const PLAN_LANGUAGE_TOOLS = [
   "export_plan_language",
   "import_plan_language",
   "apply_plan_language",
+  "parse_plan_language",
   "validate_plan_language",
   "roundtrip_plan_language",
   "explain_plan_language",

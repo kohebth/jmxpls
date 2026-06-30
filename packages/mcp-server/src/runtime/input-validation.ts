@@ -24,6 +24,11 @@ const NODE_ID: FieldRule = { name: "nodeId", type: "string" };
 const PARENT_ID_ALIASES: FieldRule[] = [{ name: "parentNodeId", type: "string" }, { name: "parentId", type: "string" }];
 const NODE_TYPE_ALIASES: FieldRule[] = [{ name: "nodeType", type: "string" }, { name: "type", type: "string" }];
 const PATCH_OPTIONALS: FieldRule[] = [{ name: "dryRun", type: "boolean" }, { name: "validate", type: "boolean" }];
+const PLAN_LANGUAGE_SOURCE_OPTIONAL: FieldRule[] = [{ name: "text", type: "string" }, { name: "path", type: "string" }];
+const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
+  { name: "mode", type: "string", enum: ["replace", "merge", "patch"] },
+  ...PATCH_OPTIONALS
+];
 const POSITION_OPTIONALS: FieldRule[] = [{ name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS];
 const PARENT_OPTIONALS: FieldRule[] = PARENT_ID_ALIASES;
 const HTTP_TARGET_OPTIONALS: FieldRule[] = [
@@ -54,6 +59,9 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   get_plan_language: { required: [PLAN_ID], optional: [{ name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] }, { name: "format", type: "string", enum: ["object", "json", "yaml"] }] },
   export_plan_language: { required: [PLAN_ID], optional: [{ name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] }, { name: "format", type: "string", enum: ["object", "json", "yaml"] }] },
   validate_plan_language: { required: [{ name: "text", type: "string" }] },
+  parse_plan_language: { required: [{ name: "text", type: "string" }] },
+  import_plan_language: { requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: [{ name: "targetPath", type: "string" }, ...PLAN_LANGUAGE_APPLY_OPTIONALS] },
+  apply_plan_language: { required: [PLAN_ID], requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: PLAN_LANGUAGE_APPLY_OPTIONALS },
   roundtrip_plan_language: { required: [PLAN_ID] },
   explain_plan_language: { requiredOneOf: [[PLAN_ID, { name: "text", type: "string" }]] },
   compare_plan_language: { required: [{ name: "left", type: "string" }, { name: "right", type: "string" }] },

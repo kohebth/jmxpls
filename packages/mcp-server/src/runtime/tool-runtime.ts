@@ -7,14 +7,37 @@ import {
   serializePlanLanguage,
   SessionManager,
   summarizePlan,
+  type PlanLanguageDocument,
+  type PlanLanguageNode,
   type PlanLanguageMode,
   type SemanticNode,
   type SemanticPatch,
   type SemanticPatchOperation,
   type SemanticRole
 } from "@jmxpls/core";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 
 import { validateToolInput } from "./input-validation.js";
+
+const PLAN_LANGUAGE_ROLES = new Set(["testPlan", "threadGroup", "controller", "sampler", "config", "timer", "assertion", "extractor", "processor", "listener", "unknown"]);
+const PLAN_LANGUAGE_MODES = new Set(["outline", "flow", "semantic", "full"]);
+const PLAN_LANGUAGE_DETAILS = new Set(["compact", "expanded", "lossless-references", "raw-linked"]);
+const PLAN_LANGUAGE_APPLY_MODES = new Set(["replace", "merge", "patch"]);
+
+const MINIMAL_PLAN_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Minimal Plan" enabled="true">
+      <stringProp name="TestPlan.comments" />
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+    </TestPlan>
+    <hashTree/>
+  </hashTree>
+</jmeterTestPlan>`;
+
+type PlanLanguageApplyMode = "replace" | "merge" | "patch";
 
 export type ToolCallResult = { success: boolean; data?: unknown; error?: string };
 export type ToolCallInput = Record<string, unknown>;
@@ -42,6 +65,9 @@ export class JmxplsRuntime {
         case "explain_execution_flow": return this.withSession(input, (session) => executionFlow(session.semanticPlan()));
         case "get_plan_language":
         case "export_plan_language": return this.getPlanLanguage(input);
+        case "parse_plan_language": return this.parsePlanLanguage(input);
+        case "import_plan_language": return this.importPlanLanguage(input);
+        case "apply_plan_language": return this.applyPlanLanguage(input);
         case "validate_plan_language": return this.validatePlanLanguage(input);
         case "roundtrip_plan_language": return this.withSession(input, (session) => roundTripPlanLanguage(session.semanticPlan()));
         case "explain_plan_language": return this.explainPlanLanguage(input);
@@ -150,6 +176,209 @@ export class JmxplsRuntime {
         diagnostics
       }
     };
+  }
+  private parsePlanLanguage(input: ToolCallInput): ToolCallResult {
+    const parsed = parsePlanLanguage(requiredString(input, "text"));
+    const diagnostics = validatePlanLanguageDocument(parsed.document);
+    return {
+      success: true,
+      data: {
+        valid: parsed.document.format === "jmxpls-plan-language" && diagnostics.length === 0,
+        sourceFormat: parsed.sourceFormat,
+        document: parsed.document,
+        diagnostics
+      }
+    };
+  }
+  private async importPlanLanguage(input: ToolCallInput): Promise<ToolCallResult> {
+    const parsed = this.parsePlanLanguageInput(input);
+    if (parsed.diagnostics.length > 0) {
+      return { success: false, error: `Invalid plan language document: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}` };
+    }
+
+    const mode = this.planLanguageApplyMode(input);
+    const targetPath = this.resolveImportTargetPath(optionalString(input, "targetPath"));
+    const session = await this.sessions.openPlan(targetPath);
+    const result = this.applyPlanLanguageDocument(session, parsed.document, mode, input, true);
+    return {
+      ...result,
+      data: {
+        ...(typeof result.data === "object" && result.data !== null ? result.data : {}),
+        sourcePath: targetPath,
+        mode,
+        sourceFormat: parsed.sourceFormat
+      }
+    };
+  }
+  private applyPlanLanguage(input: ToolCallInput): ToolCallResult {
+    const planId = requiredString(input, "planId");
+    const session = this.sessions.get(planId);
+    if (!session) return { success: false, error: `Unknown planId: ${planId}` };
+
+    const parsed = this.parsePlanLanguageInput(input);
+    if (parsed.diagnostics.length > 0) {
+      return { success: false, error: `Invalid plan language document: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}` };
+    }
+
+    const mode = this.planLanguageApplyMode(input);
+    const result = this.applyPlanLanguageDocument(session, parsed.document, mode, input, false);
+    return {
+      ...result,
+      data: {
+        ...(typeof result.data === "object" && result.data !== null ? result.data : {}),
+        mode,
+        sourceFormat: parsed.sourceFormat
+      }
+    };
+  }
+  private applyPlanLanguageDocument(
+    session: PlanSession,
+    document: PlanLanguageDocument,
+    mode: PlanLanguageApplyMode,
+    input: ToolCallInput,
+    isImport: boolean
+  ): ToolCallResult {
+    const root = session.semanticPlan().root[0];
+    if (!root) return { success: false, error: `No root node in target plan: ${session.planId}` };
+
+    const sourceRoot = document.nodes[0]?.role === "testPlan" ? document.nodes[0] : undefined;
+    const sourceChildren = sourceRoot ? sourceRoot.children ?? [] : document.nodes;
+
+    if (sourceRoot) {
+      this.applyNodeChanges(session, root.nodeId, sourceRoot, input);
+    }
+
+    if (mode === "replace") {
+      this.deleteChildren(session, root.nodeId, input);
+    }
+
+    this.syncPlanLanguageChildren(session, sourceChildren, root.nodeId, mode, input);
+
+    return {
+      success: true,
+      data: {
+        planId: session.planId,
+        planPath: session.sourcePath,
+        planSummary: summarizePlan(session.semanticPlan()),
+        ...(isImport ? {} : { operationMode: mode })
+      }
+    };
+  }
+  private syncPlanLanguageChildren(session: PlanSession, children: PlanLanguageNode[], parentNodeId: string, mode: PlanLanguageApplyMode, input: ToolCallInput): void {
+    const used = new Set<string>();
+    for (const source of children) {
+      const currentChildren = this.childrenOf(session, parentNodeId);
+      const match = this.findMatchingChild(currentChildren, source, used);
+      let targetNodeId: string;
+
+      if (mode === "replace" && !match) {
+        targetNodeId = this.addPlanLanguageNode(session, parentNodeId, source, input, currentChildren.length);
+        used.add(targetNodeId);
+      } else if (match) {
+        this.applyNodeChanges(session, match.nodeId, source, input);
+        targetNodeId = match.nodeId;
+        used.add(match.nodeId);
+      } else {
+        targetNodeId = this.addPlanLanguageNode(session, parentNodeId, source, input, currentChildren.length);
+        used.add(targetNodeId);
+      }
+
+      this.syncPlanLanguageChildren(session, source.children ?? [], targetNodeId, mode, input);
+    }
+  }
+  private addPlanLanguageNode(session: PlanSession, parentNodeId: string, source: PlanLanguageNode, input: ToolCallInput, index?: number): string {
+    const existing = new Set(this.childrenOf(session, parentNodeId).map((node) => node.nodeId));
+    const addOperation: SemanticPatchOperation = {
+      op: "addNode",
+      parentNodeId,
+      nodeType: source.type,
+      fields: {
+        name: source.name,
+        enabled: source.enabled,
+        ...(source.fields ?? {})
+      }
+    };
+    if (index !== undefined) {
+      addOperation.index = index;
+    }
+    const result = session.applyPatch(patchWithFlags(input, [addOperation]));
+    const added = flattenSemanticNodes(result.semantic.root).find((node) => node.parentNodeId === parentNodeId && !existing.has(node.nodeId) && node.type === source.type);
+    if (!added) {
+      const fallback = flattenSemanticNodes(result.semantic.root).find((node) => !existing.has(node.nodeId) && node.type === source.type);
+      if (!fallback) throw new Error(`Unable to add node ${source.type}:${source.name}`);
+      return fallback.nodeId;
+    }
+    return added.nodeId;
+  }
+  private applyNodeChanges(session: PlanSession, targetNodeId: string, source: PlanLanguageNode, input: ToolCallInput): void {
+    const target = semanticNodes(session).find((node) => node.nodeId === targetNodeId);
+    if (!target) return;
+    const operations: SemanticPatchOperation[] = [];
+
+    if (target.name !== source.name) {
+      operations.push({ op: "updateField", nodeId: targetNodeId, fieldPath: "name", value: source.name });
+    }
+
+    if (target.enabled !== source.enabled) {
+      operations.push({ op: "setEnabled", nodeId: targetNodeId, enabled: source.enabled });
+    }
+
+    const fields = source.fields ?? {};
+    for (const [fieldPath, value] of Object.entries(fields)) {
+      if (fieldPath === "name" || fieldPath === "enabled" || value === undefined) continue;
+      const path = fieldPath === "guiClass" ? "attributes.guiclass" : fieldPath;
+      operations.push({ op: "updateField", nodeId: targetNodeId, fieldPath: path, value });
+    }
+
+    if (operations.length > 0) {
+      session.applyPatch(patchWithFlags(input, operations));
+    }
+  }
+  private deleteChildren(session: PlanSession, parentNodeId: string, input: ToolCallInput): void {
+    const current = this.childrenOf(session, parentNodeId);
+    if (current.length === 0) {
+      return;
+    }
+    session.applyPatch(patchWithFlags(input, current.map((node) => ({ op: "deleteNode", nodeId: node.nodeId }))));
+  }
+  private childrenOf(session: PlanSession, parentNodeId: string): SemanticNode[] {
+    return semanticNodes(session).filter((node) => node.parentNodeId === parentNodeId);
+  }
+  private findMatchingChild(children: SemanticNode[], source: PlanLanguageNode, used: Set<string>): SemanticNode | undefined {
+    const candidates = children.filter((node) => !used.has(node.nodeId));
+    const exact = candidates.find((node) => node.name === source.name && node.type === source.type && node.role === source.role);
+    if (exact) return exact;
+    const typeMatch = candidates.find((node) => node.type === source.type && node.role === source.role);
+    if (typeMatch) return typeMatch;
+    const nameMatch = candidates.find((node) => node.name === source.name);
+    return nameMatch;
+  }
+  private parsePlanLanguageInput(input: ToolCallInput): { sourceFormat: "json" | "yaml"; document: PlanLanguageDocument; diagnostics: Array<{ code: string; message: string; field?: string }> } {
+    const text = optionalString(input, "text") ?? readFileSync(resolve(requiredString(input, "path")), "utf8");
+    const parsed = parsePlanLanguage(text);
+    return { ...parsed, diagnostics: validatePlanLanguageDocument(parsed.document) };
+  }
+  private planLanguageApplyMode(input: ToolCallInput): PlanLanguageApplyMode {
+    const inputMode = optionalString(input, "mode");
+    if (typeof inputMode === "string" && PLAN_LANGUAGE_APPLY_MODES.has(inputMode)) {
+      return inputMode as PlanLanguageApplyMode;
+    }
+    return "patch";
+  }
+  private resolveImportTargetPath(requestedPath?: string): string {
+    if (requestedPath) {
+      const resolved = resolve(requestedPath);
+      if (!existsSync(resolved)) {
+        mkdirSync(dirname(resolved), { recursive: true });
+        writeFileSync(resolved, MINIMAL_PLAN_TEMPLATE);
+      }
+      return resolved;
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-"));
+    const path = join(dir, "plan.jmx");
+    writeFileSync(path, MINIMAL_PLAN_TEMPLATE);
+    return path;
   }
   private explainPlanLanguage(input: ToolCallInput): ToolCallResult {
     const text = optionalString(input, "text");
@@ -277,7 +506,7 @@ function validatePlanLanguageDocument(document: unknown): Array<{ code: string; 
     errors.push({ code: "PLANG_SCHEMA_INVALID", message: "version must be 1.", field: "version" });
   }
 
-  if (candidate.mode !== "outline" && candidate.mode !== "flow" && candidate.mode !== "semantic" && candidate.mode !== "full") {
+  if (typeof candidate.mode !== "string" || !PLAN_LANGUAGE_MODES.has(candidate.mode)) {
     errors.push({ code: "PLANG_SCHEMA_INVALID", message: "mode must be one of outline, flow, semantic, full.", field: "mode" });
   }
 
@@ -287,13 +516,71 @@ function validatePlanLanguageDocument(document: unknown): Array<{ code: string; 
 
   if (!Array.isArray(candidate.nodes)) {
     errors.push({ code: "PLANG_SCHEMA_INVALID", message: "nodes must be an array.", field: "nodes" });
+  } else {
+    validatePlanLanguageNodes(candidate.nodes, "nodes", errors);
   }
 
   if (!Array.isArray(candidate.warnings)) {
     errors.push({ code: "PLANG_SCHEMA_INVALID", message: "warnings must be an array.", field: "warnings" });
+  } else if (candidate.warnings.some((warning) => typeof warning !== "string")) {
+    errors.push({ code: "PLANG_SCHEMA_INVALID", message: "warnings must contain only strings.", field: "warnings" });
+  }
+
+  if (candidate.detail !== undefined && (typeof candidate.detail !== "string" || !PLAN_LANGUAGE_DETAILS.has(candidate.detail))) {
+    errors.push({ code: "PLANG_SCHEMA_INVALID", message: "detail must be one of compact, expanded, lossless-references, raw-linked.", field: "detail" });
   }
 
   return errors;
+}
+
+function validatePlanLanguageNodes(nodes: unknown[], field: string, diagnostics: Array<{ code: string; message: string; field?: string }>): void {
+  for (const [index, node] of nodes.entries()) {
+    validatePlanLanguageNode(node, `${field}[${index}]`, diagnostics);
+  }
+}
+
+function validatePlanLanguageNode(node: unknown, path: string, diagnostics: Array<{ code: string; message: string; field?: string }>): void {
+  if (typeof node !== "object" || node === null || Array.isArray(node)) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "node must be an object.", field: path });
+    return;
+  }
+
+  const candidate = node as Record<string, unknown>;
+  const children = candidate.children;
+
+  if (typeof candidate.nodeId !== "string" || candidate.nodeId.length === 0) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "nodeId must be a non-empty string.", field: `${path}.nodeId` });
+  }
+
+  if (typeof candidate.type !== "string" || candidate.type.length === 0) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "type must be a string.", field: `${path}.type` });
+  }
+
+  if (typeof candidate.name !== "string") {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "name must be a string.", field: `${path}.name` });
+  }
+
+  if (typeof candidate.enabled !== "boolean") {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "enabled must be a boolean.", field: `${path}.enabled` });
+  }
+
+  if (typeof candidate.role !== "string" || !PLAN_LANGUAGE_ROLES.has(candidate.role)) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "role must be a valid plan role.", field: `${path}.role` });
+  }
+
+  if (candidate.fields !== undefined && (!isObject(candidate.fields))) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "fields must be an object when present.", field: `${path}.fields` });
+  }
+
+  if (candidate.rawRef !== undefined && typeof candidate.rawRef !== "string") {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "rawRef must be a string when present.", field: `${path}.rawRef` });
+  }
+
+  if (children !== undefined && !Array.isArray(children)) {
+    diagnostics.push({ code: "PLANG_SCHEMA_INVALID", message: "children must be an array when present.", field: `${path}.children` });
+  } else if (Array.isArray(children)) {
+    validatePlanLanguageNodes(children as unknown[], `${path}.children`, diagnostics);
+  }
 }
 
 function comparePlanLanguageDocuments(left: unknown, right: unknown): boolean {

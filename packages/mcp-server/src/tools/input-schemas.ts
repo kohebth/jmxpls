@@ -24,6 +24,8 @@ const POSITION_AND_FLAGS = { enabled: BOOLEAN, index: INTEGER, ...PATCH_FLAGS };
 const TYPED_ADD_BASE = { ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, ...POSITION_AND_FLAGS };
 const HTTP_TARGET_FIELDS = { name: NON_EMPTY_STRING, protocol: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, port: STRING_OR_NUMBER, path: NON_EMPTY_STRING };
 const PLAN_LANGUAGE_OPTIONS = { mode: { type: "string", enum: ["outline", "flow", "semantic", "full"] }, format: { type: "string", enum: ["object", "json", "yaml"] } };
+const PLAN_LANGUAGE_APPLY_OPTIONS = { mode: { type: "string", enum: ["replace", "merge", "patch"] }, dryRun: BOOLEAN, validate: BOOLEAN };
+const SOURCE_TEXT_OR_PATH = { text: NON_EMPTY_STRING, path: NON_EMPTY_STRING };
 const EXTRACTOR_BASE = { ...TYPED_ADD_BASE, variableName: NON_EMPTY_STRING, defaultValue: NON_EMPTY_STRING, matchNumber: STRING_OR_NUMBER };
 const JSR223_FIELDS = { language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING, cacheKey: NON_EMPTY_STRING };
 
@@ -36,7 +38,15 @@ export const QUERY_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
 };
 
 export const PLAN_LANGUAGE_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
-  get_plan_language: objectSchema({ ...PLAN_ID, ...PLAN_LANGUAGE_OPTIONS }, ["planId"]), export_plan_language: objectSchema({ ...PLAN_ID, ...PLAN_LANGUAGE_OPTIONS }, ["planId"]), validate_plan_language: objectSchema({ text: NON_EMPTY_STRING }, ["text"]), roundtrip_plan_language: objectSchema(PLAN_ID, ["planId"]), explain_plan_language: objectSchema({ ...PLAN_ID, text: NON_EMPTY_STRING }, [], { anyOf: [{ required: ["planId"] }, { required: ["text"] }] }), compare_plan_language: objectSchema({ left: NON_EMPTY_STRING, right: NON_EMPTY_STRING }, ["left", "right"])
+  get_plan_language: objectSchema({ ...PLAN_ID, ...PLAN_LANGUAGE_OPTIONS }, ["planId"]),
+  export_plan_language: objectSchema({ ...PLAN_ID, ...PLAN_LANGUAGE_OPTIONS }, ["planId"]),
+  validate_plan_language: objectSchema({ text: NON_EMPTY_STRING }, ["text"]),
+  parse_plan_language: objectSchema({ text: NON_EMPTY_STRING }, ["text"]),
+  roundtrip_plan_language: objectSchema(PLAN_ID, ["planId"]),
+  explain_plan_language: objectSchema({ ...PLAN_ID, text: NON_EMPTY_STRING }, [], { anyOf: [{ required: ["planId"] }, { required: ["text"] }] }),
+  compare_plan_language: objectSchema({ left: NON_EMPTY_STRING, right: NON_EMPTY_STRING }, ["left", "right"]),
+  import_plan_language: objectSchema({ ...SOURCE_TEXT_OR_PATH, targetPath: NON_EMPTY_STRING, ...PLAN_LANGUAGE_APPLY_OPTIONS }, [], { anyOf: [{ required: ["text"] }, { required: ["path"] }] }),
+  apply_plan_language: objectSchema({ ...PLAN_ID, ...SOURCE_TEXT_OR_PATH, ...PLAN_LANGUAGE_APPLY_OPTIONS }, ["planId"], { anyOf: [{ required: ["text"] }, { required: ["path"] }] })
 };
 
 export const MUTATION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {

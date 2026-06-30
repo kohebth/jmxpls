@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -89,6 +89,151 @@ describe("JmxplsRuntime", () => {
 
     const compareFailure = await runtime.callTool("compare_plan_language", { left: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}", right: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}" });
     expect(compareFailure.success).toBe(false);
+  });
+
+  it("parses Plan Language text and recursively validates node structure", async () => {
+    const runtime = new JmxplsRuntime();
+    const parse = await runtime.callTool("parse_plan_language", {
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "test",
+        nodes: [{ nodeId: "root", role: "testPlan", type: "TestPlan", name: "root", enabled: true, children: [{ nodeId: "child", role: "threadGroup", type: "ThreadGroup", name: "tg", enabled: false }] }],
+        warnings: []
+      })
+    });
+    expect(parse.success).toBe(true);
+    expect((parse.data as { valid: boolean }).valid).toBe(true);
+
+    const nestedInvalid = await runtime.callTool("parse_plan_language", {
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        name: "test",
+        nodes: [{ nodeId: "root", role: "testPlan", type: "TestPlan", name: "root", enabled: true, children: [{ nodeId: 1, role: "sampler", type: "HTTP", name: "sample", enabled: true }] }],
+        warnings: []
+      })
+    });
+    expect(nestedInvalid.success).toBe(true);
+    expect((nestedInvalid.data as { valid: boolean }).valid).toBe(false);
+    expect((nestedInvalid.data as { diagnostics: Array<{ field: string; code: string }> }).diagnostics).toContainEqual(expect.objectContaining({ field: "nodes[0].children[0].nodeId", code: "PLANG_SCHEMA_INVALID" }));
+
+    const badSyntax = await runtime.callTool("parse_plan_language", { text: "format: [ " });
+    expect(badSyntax.success).toBe(false);
+  });
+
+  it("imports Plan Language text into a new target plan", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-"));
+    const targetPath = join(dir, "plan.jmx");
+    const runtime = new JmxplsRuntime();
+    const importResult = await runtime.callTool("import_plan_language", {
+      targetPath,
+      mode: "patch",
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "imported",
+        nodes: [{
+          nodeId: "root",
+          role: "testPlan",
+          type: "TestPlan",
+          name: "imported plan",
+          enabled: true,
+          children: [{
+            nodeId: "tg1",
+            role: "threadGroup",
+            type: "ThreadGroup",
+            name: "baseline",
+            enabled: true
+          }]
+        }],
+        warnings: []
+      })
+    });
+
+    expect(importResult.success).toBe(true);
+    const planId = (importResult.data as { planId: string }).planId;
+    const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect(threadGroups.success).toBe(true);
+    expect((threadGroups.data as Array<{ name: string }>).length).toBe(1);
+    expect((threadGroups.data as Array<{ name: string }>)[0]?.name).toBe("baseline");
+    expect(existsSync(targetPath)).toBe(true);
+  });
+
+  it("replaces an applied plan in replace mode", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+
+    const added = await runtime.callTool("apply_plan_language", {
+      planId,
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "before",
+        nodes: [{
+          nodeId: "root",
+          role: "testPlan",
+          type: "TestPlan",
+          name: "Minimal Plan",
+          enabled: true,
+          children: [{
+            nodeId: "keep",
+            role: "threadGroup",
+            type: "ThreadGroup",
+            name: "keep",
+            enabled: true
+          }]
+        }],
+        warnings: []
+      })
+    });
+    expect(added.success).toBe(true);
+    const beforeReplace = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect((beforeReplace.data as Array<{ name: string }>).map((node) => node.name)).toContain("keep");
+
+    const replaced = await runtime.callTool("apply_plan_language", {
+      planId,
+      mode: "replace",
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "after",
+        nodes: [{
+          nodeId: "root",
+          role: "testPlan",
+          type: "TestPlan",
+          name: "Minimal Plan",
+          enabled: true,
+          children: [{
+            nodeId: "replace",
+            role: "threadGroup",
+            type: "ThreadGroup",
+            name: "replaced",
+            enabled: true
+          }]
+        }],
+        warnings: []
+      })
+    });
+    expect(replaced.success).toBe(true);
+    const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect((threadGroups.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
+    expect((threadGroups.data as Array<{ name: string; nodeId: string }>)[0]?.name).toBe("replaced");
   });
 
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {

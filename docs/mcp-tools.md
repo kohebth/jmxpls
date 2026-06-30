@@ -21,7 +21,9 @@ Resources provide read-only, progressive disclosure views for plans, catalogs, r
 ## Plan Language
 
 - `get_plan_language` and `export_plan_language` project an opened plan into `outline`, `flow`, `semantic`, or `full` modes.
-- `validate_plan_language`, `roundtrip_plan_language`, `explain_plan_language`, and `compare_plan_language` validate and compare compact plan-language documents.
+- `import_plan_language` creates a new plan from JSON/YAML Plan Language text or file path and applies it to a new or explicit `targetPath`.
+- `apply_plan_language` applies Plan Language from text or path to an opened `planId` using `mode: replace|merge|patch` (default `patch`).
+- `parse_plan_language` parses raw JSON or YAML Plan Language, while `validate_plan_language`, `roundtrip_plan_language`, `explain_plan_language`, and `compare_plan_language` validate and compare compact Plan Language documents.
 
 ## Semantic Mutations
 
