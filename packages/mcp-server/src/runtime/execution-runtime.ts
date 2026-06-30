@@ -23,6 +23,7 @@ import { TemplateToolRuntime } from "./template-runtime.js";
 import { JmxplsRuntime as BaseRuntime, type ToolCallInput, type ToolCallResult } from "./tool-runtime.js";
 
 type RawNodeView = { nodeId: string; rawRef: string; fields: Record<string, unknown> };
+type OpenPlanSummary = { planId: string; sourcePath: string };
 
 export class JmxplsRuntime extends BaseRuntime {
   private readonly runs = new RunManager();
@@ -108,13 +109,16 @@ export class JmxplsRuntime extends BaseRuntime {
     if (name !== "validate_with_jmeter" && name !== "roundtrip_validate") {
       return undefined;
     }
-    const path = optionalPath(input, ["path", "planPath", "jmxPath"]);
-    if (!path) {
-      return undefined;
-    }
 
     const mode = name === "roundtrip_validate" ? "loadSaveReload" : validationMode(input);
     const options = bridgeOptionsFromEnv();
+    let path = optionalPath(input, ["path", "planPath", "jmxPath"]);
+    if (!path && options) {
+      path = await this.sourcePathForPlan(input);
+    }
+    if (!path) {
+      return undefined;
+    }
     if (!options) {
       return bridgeNotConfigured(path, mode, input.strict === true);
     }
@@ -132,6 +136,18 @@ export class JmxplsRuntime extends BaseRuntime {
     } finally {
       bridge.close();
     }
+  }
+
+  private async sourcePathForPlan(input: ToolCallInput): Promise<string | undefined> {
+    const planId = optionalString(input, "planId");
+    if (!planId) {
+      return undefined;
+    }
+    const result = await super.callTool("list_open_plans");
+    if (!result.success || !Array.isArray(result.data)) {
+      return undefined;
+    }
+    return result.data.find((item): item is OpenPlanSummary => isOpenPlanSummary(item) && item.planId === planId)?.sourcePath;
   }
 
   private async getRawElement(input: ToolCallInput): Promise<ToolCallResult> {
@@ -346,6 +362,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isRawNodeView(value: unknown): value is RawNodeView {
   return isObject(value) && typeof value.nodeId === "string" && typeof value.rawRef === "string" && isObject(value.fields);
+}
+
+function isOpenPlanSummary(value: unknown): value is OpenPlanSummary {
+  return isObject(value) && typeof value.planId === "string" && typeof value.sourcePath === "string";
 }
 
 function patchFlags(input: ToolCallInput): ToolCallInput {

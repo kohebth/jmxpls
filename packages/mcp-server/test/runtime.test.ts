@@ -69,7 +69,7 @@ describe("JmxplsRuntime", () => {
     }
   });
 
-  it("validates a JMX path through a configured bridge process", async () => {
+  it("validates direct and opened JMX paths through a configured bridge process", async () => {
     const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
     const previousCommand = process.env.JMXPLS_JAVA_COMMAND;
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-bridge-"));
@@ -96,6 +96,19 @@ describe("JmxplsRuntime", () => {
       expect((result.data as { valid: boolean }).valid).toBe(true);
       expect((result.data as { path: string }).path).toBe("plan.jmx");
       expect((result.data as { mode: string }).mode).toBe("load");
+
+      const planPath = join(dir, "minimal.jmx");
+      copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+      const opened = await runtime.callTool("open_plan", { path: planPath });
+      expect(opened.success).toBe(true);
+      const planId = (opened.data as { planId: string }).planId;
+      const sessionResult = await runtime.callTool("validate_with_jmeter", { planId, mode: "loadSaveReload" });
+
+      expect(sessionResult.success).toBe(true);
+      expect((sessionResult.data as { jmeterBacked: boolean }).jmeterBacked).toBe(true);
+      expect((sessionResult.data as { valid: boolean }).valid).toBe(true);
+      expect((sessionResult.data as { path: string }).path).toBe(planPath);
+      expect((sessionResult.data as { mode: string }).mode).toBe("loadSaveReload");
     } finally {
       if (previousJar === undefined) {
         delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
