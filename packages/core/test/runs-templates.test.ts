@@ -45,6 +45,10 @@ describe("runs, IO, and templates", () => {
   });
 
   it("registers built-in templates", () => {
-    expect(createBuiltInTemplateRegistry().get("http_api_baseline")?.instantiate().operations).toEqual([]);
+    const patch = createBuiltInTemplateRegistry().get("http_api_baseline")?.instantiate();
+
+    expect(patch?.operations).toHaveLength(4);
+    expect(patch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
+    expect(patch?.operations[2]).toMatchObject({ op: "addNode", parentNodeId: "template-http-api-thread-group", nodeType: "HTTPSamplerProxy" });
   });
 });
