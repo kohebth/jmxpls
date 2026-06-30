@@ -49,6 +49,33 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(planPath, "utf8")).toContain('enabled="false"');
   });
 
+  it("validates Plan Language text for JSON and YAML formats", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-plan-language-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+
+    const jsonText = await runtime.callTool("get_plan_language", { planId, format: "json", mode: "semantic" });
+    expect(jsonText.success).toBe(true);
+    const jsonValidation = await runtime.callTool("validate_plan_language", { text: jsonText.data as string });
+    expect(jsonValidation.success).toBe(true);
+    expect((jsonValidation.data as { valid: boolean; sourceFormat: string }).sourceFormat).toBe("json");
+    expect((jsonValidation.data as { valid: boolean }).valid).toBe(true);
+
+    const yamlText = await runtime.callTool("get_plan_language", { planId, format: "yaml", mode: "semantic" });
+    expect(yamlText.success).toBe(true);
+    const yamlValidation = await runtime.callTool("validate_plan_language", { text: yamlText.data as string });
+    expect(yamlValidation.success).toBe(true);
+    expect((yamlValidation.data as { valid: boolean; sourceFormat: string }).sourceFormat).toBe("yaml");
+    expect((yamlValidation.data as { valid: boolean }).valid).toBe(true);
+
+    const invalidYaml = await runtime.callTool("validate_plan_language", { text: "plan: [ " });
+    expect(invalidYaml.success).toBe(false);
+  });
+
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
     const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
     delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
