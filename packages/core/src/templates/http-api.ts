@@ -1,20 +1,24 @@
-import type { PlanTemplate } from "./registry.js";
+import type { PlanTemplate, TemplateParameter } from "./registry.js";
 import { numberInput, scalarInput, stringInput } from "./input.js";
+
+const commonHttpParameters: TemplateParameter[] = [
+  { name: "idPrefix", type: "string", description: "Node ID prefix for generated elements." },
+  { name: "domain", type: "string", description: "Default HTTP host.", defaultValue: "example.com" },
+  { name: "protocol", type: "string", description: "Default HTTP protocol.", defaultValue: "https" },
+  { name: "port", type: "stringOrNumber", description: "Optional default HTTP port." },
+  { name: "threads", type: "number", description: "Thread group user count.", defaultValue: 10 },
+  { name: "rampSec", type: "number", description: "Thread group ramp-up in seconds.", defaultValue: 10 },
+  { name: "loops", type: "number", description: "Loop count for each thread.", defaultValue: 1 },
+  { name: "threadGroupName", type: "string", description: "Generated thread group name." }
+];
 
 export const httpApiBaselineTemplate: PlanTemplate = {
   name: "http_api_baseline",
   description: "Baseline HTTP API test plan patch.",
   parameters: [
-    { name: "idPrefix", type: "string", description: "Node ID prefix for generated elements.", defaultValue: "template-http-api" },
-    { name: "domain", type: "string", description: "Default HTTP host.", defaultValue: "example.com" },
-    { name: "protocol", type: "string", description: "Default HTTP protocol.", defaultValue: "https" },
-    { name: "port", type: "stringOrNumber", description: "Optional default HTTP port." },
+    ...commonHttpParameters.map((parameter) => parameter.name === "idPrefix" ? { ...parameter, defaultValue: "template-http-api" } : parameter),
     { name: "path", type: "string", description: "Sample request path.", defaultValue: "/health" },
     { name: "method", type: "string", description: "Sample request method.", defaultValue: "GET" },
-    { name: "threads", type: "number", description: "Thread group user count.", defaultValue: 10 },
-    { name: "rampSec", type: "number", description: "Thread group ramp-up in seconds.", defaultValue: 10 },
-    { name: "loops", type: "number", description: "Loop count for each thread.", defaultValue: 1 },
-    { name: "threadGroupName", type: "string", description: "Generated thread group name.", defaultValue: "HTTP API Users" },
     { name: "requestName", type: "string", description: "Generated sample request name." }
   ],
   instantiate: (input = {}) => {
@@ -38,6 +42,23 @@ export const httpApiBaselineTemplate: PlanTemplate = {
 export const httpApiLoginBearerTokenTemplate: PlanTemplate = {
   name: "http_api_login_bearer_token",
   description: "HTTP API login flow with bearer token extraction.",
+  parameters: [
+    ...commonHttpParameters.map((parameter) => parameter.name === "idPrefix" ? { ...parameter, defaultValue: "template-login-bearer" } : parameter),
+    { name: "loginPath", type: "string", description: "Login request path.", defaultValue: "/login" },
+    { name: "loginMethod", type: "string", description: "Login request method.", defaultValue: "POST" },
+    { name: "loginBody", type: "string", description: "Login request body template." },
+    { name: "loginRequestName", type: "string", description: "Generated login request name." },
+    { name: "authenticatedPath", type: "string", description: "Authenticated sample request path.", defaultValue: "/profile" },
+    { name: "authenticatedMethod", type: "string", description: "Authenticated sample request method.", defaultValue: "GET" },
+    { name: "authenticatedRequestName", type: "string", description: "Generated authenticated request name." },
+    { name: "usernameVariable", type: "string", description: "Username variable referenced in the login body.", defaultValue: "username" },
+    { name: "passwordVariable", type: "string", description: "Password variable referenced in the login body.", defaultValue: "password" },
+    { name: "tokenVariable", type: "string", description: "JMeter variable that stores the extracted token.", defaultValue: "authToken" },
+    { name: "tokenJsonPath", type: "string", description: "JSONPath expression used to extract the token.", defaultValue: "$.token" },
+    { name: "tokenDefault", type: "string", description: "Default value when token extraction fails.", defaultValue: "TOKEN_NOT_FOUND" },
+    { name: "authHeaderName", type: "string", description: "Authorization header name.", defaultValue: "Authorization" },
+    { name: "authHeaderPrefix", type: "string", description: "Authorization header value prefix.", defaultValue: "Bearer" }
+  ],
   instantiate: (input = {}) => {
     const idPrefix = stringInput(input, "idPrefix", "template-login-bearer");
     const threadGroupId = `${idPrefix}-thread-group`;

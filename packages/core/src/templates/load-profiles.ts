@@ -1,5 +1,5 @@
 import type { AddNodeOperation } from "../model/patches.js";
-import type { PlanTemplate } from "./registry.js";
+import type { PlanTemplate, TemplateParameter } from "./registry.js";
 import type { TemplateInput } from "./registry.js";
 import { numberInput, scalarInput, stringInput } from "./input.js";
 
@@ -14,9 +14,31 @@ const profiles: LoadProfileSpec[] = [
   { name: "soak_load_profile", title: "Soak Load", description: "Long-running HTTP soak load with moderate throughput.", id: "template-soak-load-thread-group", users: 25, rampSec: 300, durationSec: 14400, timer: { nodeType: "ConstantThroughputTimer", guiClass: "TestBeanGUI", name: "Soak throughput cap", fields: { throughput: 150, calcMode: 1 } } }
 ];
 
+const loadProfileParameters: TemplateParameter[] = [
+  { name: "idPrefix", type: "string", description: "Node ID prefix for generated elements." },
+  { name: "domain", type: "string", description: "Default HTTP host.", defaultValue: "example.com" },
+  { name: "protocol", type: "string", description: "Default HTTP protocol.", defaultValue: "https" },
+  { name: "port", type: "stringOrNumber", description: "Optional default HTTP port." },
+  { name: "path", type: "string", description: "Sample request path.", defaultValue: "/health" },
+  { name: "method", type: "string", description: "Sample request method.", defaultValue: "GET" },
+  { name: "threads", type: "number", description: "Thread group user count." },
+  { name: "rampSec", type: "number", description: "Thread group ramp-up in seconds." },
+  { name: "durationSec", type: "number", description: "Scheduled load duration in seconds." },
+  { name: "threadGroupName", type: "string", description: "Generated thread group name." },
+  { name: "requestName", type: "string", description: "Generated sample request name." },
+  { name: "timerName", type: "string", description: "Generated timer name." },
+  { name: "delayMs", type: "number", description: "Constant timer delay in milliseconds." },
+  { name: "targetThroughput", type: "number", description: "Throughput timer target." },
+  { name: "throughputPeriod", type: "number", description: "Precise throughput timer period in seconds." },
+  { name: "groupSize", type: "number", description: "Synchronizing timer group size." },
+  { name: "timeoutMs", type: "number", description: "Synchronizing timer timeout in milliseconds." },
+  { name: "calcMode", type: "number", description: "Constant throughput timer calculation mode." }
+];
+
 export const loadProfileTemplates: PlanTemplate[] = profiles.map((profile) => ({
   name: profile.name,
   description: profile.description,
+  parameters: loadProfileParameters,
   instantiate: (input = {}) => ({ dryRun: true, operations: loadProfileOperations(profile, input) })
 }));
 

@@ -74,6 +74,10 @@ describe("runs, IO, and templates", () => {
     expect(bearerPatch?.operations).toHaveLength(6);
     expect(bearerPatch?.operations[2]).toMatchObject({ op: "addNode", nodeId: "template-login-bearer-request", nodeType: "HTTPSamplerProxy" });
     expect(bearerPatch?.operations[3]).toMatchObject({ op: "addNode", parentNodeId: "template-login-bearer-request", nodeType: "JSONPostProcessor" });
+    expect(registry.get("http_api_login_bearer_token")?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "tokenVariable", type: "string", defaultValue: "authToken" }),
+      expect.objectContaining({ name: "authenticatedPath", type: "string", defaultValue: "/profile" })
+    ]));
     expect(registry.get("http_api_login_bearer_token")?.instantiate({ idPrefix: "custom-bearer", domain: "secure.example", loginPath: "/auth/login", authenticatedPath: "/v1/me", tokenVariable: "jwt", tokenJsonPath: "$.access_token", authHeaderPrefix: "Token" }).operations).toEqual(expect.arrayContaining([
       expect.objectContaining({ op: "addNode", nodeId: "custom-bearer-thread-group" }),
       expect.objectContaining({ op: "addNode", nodeId: "custom-bearer-request", fields: expect.objectContaining({ "HTTPSampler.path": "/auth/login" }) }),
@@ -84,6 +88,10 @@ describe("runs, IO, and templates", () => {
     expect(csvPatch?.operations).toHaveLength(5);
     expect(csvPatch?.operations[1]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-thread-group", nodeType: "CSVDataSet" });
     expect(csvPatch?.operations[4]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-request", nodeType: "ResponseAssertion" });
+    expect(registry.get("csv_driven_login_flow")?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "csvFilename", type: "string", defaultValue: "users.csv" }),
+      expect.objectContaining({ name: "expectedStatus", type: "string", defaultValue: "200" })
+    ]));
     expect(registry.get("csv_driven_login_flow")?.instantiate({ idPrefix: "custom-csv", csvFilename: "accounts.csv", usernameVariable: "email", passwordVariable: "secret", domain: "login.example", expectedStatus: "204" }).operations).toEqual(expect.arrayContaining([
       expect.objectContaining({ op: "addNode", nodeId: "custom-csv-thread-group" }),
       expect.objectContaining({ op: "addNode", fields: expect.objectContaining({ filename: "accounts.csv", variableNames: "email,secret" }) }),
@@ -96,6 +104,10 @@ describe("runs, IO, and templates", () => {
       expect(operations?.[0]).toMatchObject({ op: "addNode", parentNodeId: "root", nodeType: "ThreadGroup" });
       expect(operations?.[2]).toMatchObject({ op: "addNode", nodeType: "HTTPSamplerProxy" });
       expect(operations?.[3]).toMatchObject({ op: "addNode", nodeType: timerType });
+      expect(registry.get(name)?.parameters).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: "durationSec", type: "number" }),
+        expect.objectContaining({ name: "targetThroughput", type: "number" })
+      ]));
     }
     expect(registry.get("ramp_load_profile")?.instantiate({ idPrefix: "custom-ramp", domain: "load.example", path: "/v2/ping", threads: 75, rampSec: 600, durationSec: 1200, targetThroughput: 450, throughputPeriod: 30 }).operations).toEqual([
       expect.objectContaining({ op: "addNode", nodeId: "custom-ramp-thread-group", fields: expect.objectContaining({ "ThreadGroup.num_threads": 75, "ThreadGroup.ramp_time": 600, "ThreadGroup.duration": 1200 }) }),

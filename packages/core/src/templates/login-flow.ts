@@ -1,9 +1,35 @@
-import type { PlanTemplate } from "./registry.js";
+import type { PlanTemplate, TemplateParameter } from "./registry.js";
 import { booleanInput, numberInput, scalarInput, stringInput } from "./input.js";
+
+const csvLoginParameters: TemplateParameter[] = [
+  { name: "idPrefix", type: "string", description: "Node ID prefix for generated elements.", defaultValue: "template-csv-login" },
+  { name: "domain", type: "string", description: "Default HTTP host.", defaultValue: "example.com" },
+  { name: "protocol", type: "string", description: "Default HTTP protocol.", defaultValue: "https" },
+  { name: "port", type: "stringOrNumber", description: "Optional default HTTP port." },
+  { name: "threads", type: "number", description: "Thread group user count.", defaultValue: 10 },
+  { name: "rampSec", type: "number", description: "Thread group ramp-up in seconds.", defaultValue: 10 },
+  { name: "loops", type: "number", description: "Loop count for each thread.", defaultValue: 1 },
+  { name: "threadGroupName", type: "string", description: "Generated thread group name.", defaultValue: "CSV Login Users" },
+  { name: "csvFilename", type: "string", description: "CSV file path for login users.", defaultValue: "users.csv" },
+  { name: "variableNames", type: "string", description: "CSV variable names in JMeter order.", defaultValue: "username,password" },
+  { name: "delimiter", type: "string", description: "CSV delimiter.", defaultValue: "," },
+  { name: "ignoreFirstLine", type: "boolean", description: "Whether to ignore the first CSV row.", defaultValue: true },
+  { name: "recycle", type: "boolean", description: "Whether to recycle CSV rows.", defaultValue: true },
+  { name: "stopThread", type: "boolean", description: "Whether to stop threads at EOF.", defaultValue: false },
+  { name: "shareMode", type: "string", description: "CSV sharing mode.", defaultValue: "shareMode.all" },
+  { name: "loginPath", type: "string", description: "Login request path.", defaultValue: "/login" },
+  { name: "loginMethod", type: "string", description: "Login request method.", defaultValue: "POST" },
+  { name: "loginBody", type: "string", description: "Login request body template." },
+  { name: "loginRequestName", type: "string", description: "Generated login request name." },
+  { name: "usernameVariable", type: "string", description: "Username variable referenced in the login body.", defaultValue: "username" },
+  { name: "passwordVariable", type: "string", description: "Password variable referenced in the login body.", defaultValue: "password" },
+  { name: "expectedStatus", type: "string", description: "Expected login response code.", defaultValue: "200" }
+];
 
 export const csvDrivenLoginFlowTemplate: PlanTemplate = {
   name: "csv_driven_login_flow",
   description: "CSV-driven login flow template.",
+  parameters: csvLoginParameters,
   instantiate: (input = {}) => {
     const idPrefix = stringInput(input, "idPrefix", "template-csv-login");
     const threadGroupId = `${idPrefix}-thread-group`;
