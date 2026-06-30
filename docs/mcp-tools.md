@@ -93,9 +93,16 @@ Catalog tools load, refresh, inspect, import, and export component descriptors f
 
 ## Template Tools
 
-Template tools expose built-in patch templates. Current built-ins are scaffolds that return semantic patches; some templates still have empty operation lists until the generator phase fills them in.
+Template tools expose built-in semantic patch templates. `http_api_baseline` creates a thread group with HTTP defaults, a health-check request, and a summary listener; other built-ins remain lightweight scaffolds until their generator phases are filled in.
 
 - `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.
+- `instantiate_template` retargets top-level template operations to the opened plan root when `planId` is supplied; pass `apply: true` to call `apply_semantic_patch`.
 - `create_http_api_plan`, `create_login_flow`, `create_bearer_token_flow`, `create_crud_flow`, and `create_csv_driven_flow` are aliases for built-in templates.
 - `prepare_plan_for_ci` forwards to GUI-listener disabling.
 - `convert_hardcoded_values_to_variables` currently supports host-to-variable conversion through `host` and `variableName`.
+
+Example:
+
+```json
+{"name":"instantiate_template","arguments":{"name":"http_api_baseline","planId":"<planId>","dryRun":true,"apply":true}}
+```

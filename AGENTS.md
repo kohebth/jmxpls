@@ -31,4 +31,4 @@ No established Git history is available here. Use concise imperative commit mess
 
 ## Agent-Specific Instructions
 
-Use `fsmcp` for repository file actions. If it is unavailable, stop and ask rather than using a fallback. Before editing an existing protected guide such as this file, ask the user for permission.
+Use `apply_patch` for manual repository edits. Before editing an existing protected guide such as this file, ask the user for permission.
