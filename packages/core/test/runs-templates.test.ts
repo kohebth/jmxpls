@@ -93,5 +93,12 @@ describe("runs, IO, and templates", () => {
       expect(operations?.[2]).toMatchObject({ op: "addNode", nodeType: "HTTPSamplerProxy" });
       expect(operations?.[3]).toMatchObject({ op: "addNode", nodeType: timerType });
     }
+    expect(registry.get("ramp_load_profile")?.instantiate({ idPrefix: "custom-ramp", domain: "load.example", path: "/v2/ping", threads: 75, rampSec: 600, durationSec: 1200, targetThroughput: 450, throughputPeriod: 30 }).operations).toEqual([
+      expect.objectContaining({ op: "addNode", nodeId: "custom-ramp-thread-group", fields: expect.objectContaining({ "ThreadGroup.num_threads": 75, "ThreadGroup.ramp_time": 600, "ThreadGroup.duration": 1200 }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-ramp-thread-group", fields: expect.objectContaining({ "HTTPSampler.domain": "load.example" }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-ramp-thread-group", fields: expect.objectContaining({ "HTTPSampler.path": "/v2/ping" }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-ramp-thread-group", nodeType: "PreciseThroughputTimer", fields: expect.objectContaining({ throughput: 450, throughputPeriod: 30, duration: 1200 }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-ramp-thread-group", nodeType: "ResultCollector" })
+    ]);
   });
 });

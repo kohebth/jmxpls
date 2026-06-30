@@ -16,6 +16,7 @@ const TEMPLATE_OPTIONS = {
   threads: STRING_OR_NUMBER,
   rampSec: STRING_OR_NUMBER,
   rampUpSec: STRING_OR_NUMBER,
+  durationSec: STRING_OR_NUMBER,
   loops: STRING_OR_NUMBER,
   threadGroupName: STRING,
   requestName: STRING,
@@ -40,7 +41,14 @@ const TEMPLATE_OPTIONS = {
   recycle: BOOLEAN,
   stopThread: BOOLEAN,
   shareMode: STRING,
-  expectedStatus: STRING
+  expectedStatus: STRING,
+  delayMs: STRING_OR_NUMBER,
+  targetThroughput: STRING_OR_NUMBER,
+  throughputPeriod: STRING_OR_NUMBER,
+  groupSize: STRING_OR_NUMBER,
+  timeoutMs: STRING_OR_NUMBER,
+  calcMode: STRING_OR_NUMBER,
+  timerName: STRING
 };
 const APPLY_OPTIONS = { ...PLAN_ID, parentNodeId: STRING, apply: BOOLEAN, ...PATCH_FLAGS };
 

@@ -1,5 +1,7 @@
 import type { AddNodeOperation } from "../model/patches.js";
 import type { PlanTemplate } from "./registry.js";
+import type { TemplateInput } from "./registry.js";
+import { numberInput, scalarInput, stringInput } from "./input.js";
 
 type TimerSpec = { nodeType: string; guiClass: string; name: string; fields: Record<string, unknown> };
 type LoadProfileSpec = { name: string; title: string; description: string; id: string; users: number; rampSec: number; durationSec: number; timer: TimerSpec };
@@ -15,16 +17,32 @@ const profiles: LoadProfileSpec[] = [
 export const loadProfileTemplates: PlanTemplate[] = profiles.map((profile) => ({
   name: profile.name,
   description: profile.description,
-  instantiate: () => ({ dryRun: true, operations: loadProfileOperations(profile) })
+  instantiate: (input = {}) => ({ dryRun: true, operations: loadProfileOperations(profile, input) })
 }));
 
-function loadProfileOperations(profile: LoadProfileSpec): AddNodeOperation[] {
-  const parentNodeId = profile.id;
+function loadProfileOperations(profile: LoadProfileSpec, input: TemplateInput): AddNodeOperation[] {
+  const parentNodeId = `${stringInput(input, "idPrefix", profile.id.replace(/-thread-group$/, ""))}-thread-group`;
+  const durationSec = numberInput(input, "durationSec", profile.durationSec);
+  const method = stringInput(input, "method", "GET");
+  const path = stringInput(input, "path", "/health");
+  const port = scalarInput(input, "port");
   return [
-    { op: "addNode", parentNodeId: "root", nodeId: parentNodeId, nodeType: "ThreadGroup", fields: { name: profile.title, guiClass: "ThreadGroupGui", "ThreadGroup.num_threads": profile.users, "ThreadGroup.ramp_time": profile.rampSec, "ThreadGroup.scheduler": true, "ThreadGroup.duration": profile.durationSec, "LoopController.continue_forever": true, "LoopController.loops": -1 } },
-    { op: "addNode", parentNodeId, nodeType: "ConfigTestElement", fields: { name: "HTTP Request Defaults", guiClass: "HttpDefaultsGui", "HTTPSampler.protocol": "https", "HTTPSampler.domain": "example.com" } },
-    { op: "addNode", parentNodeId, nodeType: "HTTPSamplerProxy", fields: { name: "GET /health", guiClass: "HttpTestSampleGui", "HTTPSampler.method": "GET", "HTTPSampler.path": "/health" } },
-    { op: "addNode", parentNodeId, nodeType: profile.timer.nodeType, fields: { name: profile.timer.name, guiClass: profile.timer.guiClass, ...profile.timer.fields } },
+    { op: "addNode", parentNodeId: "root", nodeId: parentNodeId, nodeType: "ThreadGroup", fields: { name: stringInput(input, "threadGroupName", profile.title), guiClass: "ThreadGroupGui", "ThreadGroup.num_threads": numberInput(input, "threads", profile.users), "ThreadGroup.ramp_time": numberInput(input, "rampSec", numberInput(input, "rampUpSec", profile.rampSec)), "ThreadGroup.scheduler": true, "ThreadGroup.duration": durationSec, "LoopController.continue_forever": true, "LoopController.loops": -1 } },
+    { op: "addNode", parentNodeId, nodeType: "ConfigTestElement", fields: { name: "HTTP Request Defaults", guiClass: "HttpDefaultsGui", "HTTPSampler.protocol": stringInput(input, "protocol", "https"), "HTTPSampler.domain": stringInput(input, "domain", "example.com"), ...(port !== undefined ? { "HTTPSampler.port": port } : {}) } },
+    { op: "addNode", parentNodeId, nodeType: "HTTPSamplerProxy", fields: { name: stringInput(input, "requestName", `${method} ${path}`), guiClass: "HttpTestSampleGui", "HTTPSampler.method": method, "HTTPSampler.path": path } },
+    { op: "addNode", parentNodeId, nodeType: profile.timer.nodeType, fields: { name: stringInput(input, "timerName", profile.timer.name), guiClass: profile.timer.guiClass, ...timerFields(profile.timer.fields, input, durationSec) } },
     { op: "addNode", parentNodeId, nodeType: "ResultCollector", fields: { name: "Summary Report", guiClass: "SummaryReport" } }
   ];
+}
+
+function timerFields(defaults: Record<string, unknown>, input: TemplateInput, durationSec: number): Record<string, unknown> {
+  const fields = { ...defaults };
+  if ("ConstantTimer.delay" in fields) fields["ConstantTimer.delay"] = numberInput(input, "delayMs", Number(fields["ConstantTimer.delay"]));
+  if ("throughput" in fields) fields.throughput = numberInput(input, "targetThroughput", Number(fields.throughput));
+  if ("throughputPeriod" in fields) fields.throughputPeriod = numberInput(input, "throughputPeriod", Number(fields.throughputPeriod));
+  if ("duration" in fields) fields.duration = durationSec;
+  if ("groupSize" in fields) fields.groupSize = numberInput(input, "groupSize", Number(fields.groupSize));
+  if ("timeoutInMs" in fields) fields.timeoutInMs = numberInput(input, "timeoutMs", Number(fields.timeoutInMs));
+  if ("calcMode" in fields) fields.calcMode = numberInput(input, "calcMode", Number(fields.calcMode));
+  return fields;
 }
