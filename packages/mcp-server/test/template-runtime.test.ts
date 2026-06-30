@@ -59,4 +59,33 @@ describe("template runtime", () => {
     expect(patch.operations[1]?.fields).toMatchObject({ "HTTPSampler.domain": "runtime.example" });
     expect(patch.operations[2]?.fields).toMatchObject({ "HTTPSampler.path": "/ready" });
   });
+
+  it("returns template metadata from list/get", async () => {
+    const runtime = new JmxplsRuntime();
+
+    const list = await runtime.callTool("list_templates", {});
+    expect(list.success).toBe(true);
+
+    const templates = list.data as Array<{ name: string; parameters: Array<{ name: string; type: string }> }>;
+    const baseline = templates.find((template) => template.name === "http_api_baseline");
+    expect(baseline).toBeTruthy();
+    expect(baseline?.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "domain", type: "string" }),
+        expect.objectContaining({ name: "threads", type: "number" })
+      ]),
+    );
+
+    const template = await runtime.callTool("get_template", { name: "http_api_login_bearer_token" });
+    expect(template.success).toBe(true);
+
+    const data = template.data as { parameters: Array<{ name: string; type: string }> };
+    expect(data.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "tokenVariable", type: "string" }),
+        expect.objectContaining({ name: "loginPath", type: "string" }),
+        expect.objectContaining({ name: "authenticatedPath", type: "string" })
+      ]),
+    );
+  });
 });
