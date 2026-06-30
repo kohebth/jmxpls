@@ -1,4 +1,4 @@
-import { createBuiltInTemplateRegistry, type SemanticPatch, type SemanticPatchOperation } from "@jmxpls/core";
+import { createBuiltInTemplateRegistry, type PlanTemplate, type SemanticPatch, type SemanticPatchOperation } from "@jmxpls/core";
 
 import type { JmxplsRuntime as BaseRuntime, ToolCallInput, ToolCallResult } from "./tool-runtime.js";
 
@@ -26,13 +26,13 @@ export class TemplateToolRuntime {
   }
 
   private listTemplates(): ToolCallResult {
-    return { success: true, data: this.templates.list().map((template) => ({ name: template.name, description: template.description })) };
+    return { success: true, data: this.templates.list().map(templateSummary) };
   }
 
   private getTemplate(input: ToolCallInput): ToolCallResult {
     const name = requiredString(input, "name");
     const template = this.templates.get(name);
-    return template ? { success: true, data: { name: template.name, description: template.description, patch: template.instantiate() } } : { success: false, error: `Unknown template: ${name}` };
+    return template ? { success: true, data: { ...templateSummary(template), patch: template.instantiate() } } : { success: false, error: `Unknown template: ${name}` };
   }
 
   private async instantiateTemplate(input: ToolCallInput, base: BaseRuntime): Promise<ToolCallResult> {
@@ -50,6 +50,10 @@ export class TemplateToolRuntime {
     }
     return { success: true, data: { name: template.name, description: template.description, patch } };
   }
+}
+
+function templateSummary(template: PlanTemplate): { name: string; description: string; parameters: NonNullable<PlanTemplate["parameters"]> } {
+  return { name: template.name, description: template.description, parameters: template.parameters ?? [] };
 }
 
 async function convertHardcodedValues(input: ToolCallInput, base: BaseRuntime): Promise<ToolCallResult> {
