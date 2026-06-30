@@ -72,6 +72,10 @@ describe("JmxplsRuntime", () => {
     expect((yamlValidation.data as { valid: boolean; sourceFormat: string }).sourceFormat).toBe("yaml");
     expect((yamlValidation.data as { valid: boolean }).valid).toBe(true);
 
+    const compare = await runtime.callTool("compare_plan_language", { left: jsonText.data as string, right: jsonText.data as string });
+    expect(compare.success).toBe(true);
+    expect((compare.data as { equivalent: boolean }).equivalent).toBe(true);
+
     const invalidYaml = await runtime.callTool("validate_plan_language", { text: "plan: [ " });
     expect(invalidYaml.success).toBe(false);
 
