@@ -37,4 +37,26 @@ describe("template runtime", () => {
       expect((result.data as { semantic: { root: Array<{ children: unknown[] }> } }).semantic.root[0]?.children).toHaveLength(1);
     }
   });
+
+  it("passes parameters through template instantiation", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-template-params-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+
+    const result = await runtime.callTool("instantiate_template", { name: "http_api_baseline", planId, idPrefix: "runtime-api", domain: "runtime.example", path: "/ready", threads: 7, dryRun: true });
+    const patch = (result.data as { patch: { dryRun: boolean; operations: Array<{ parentNodeId?: string; nodeId?: string; fields?: Record<string, unknown> }> } }).patch;
+
+    expect(result.success).toBe(true);
+    expect(patch.dryRun).toBe(true);
+    expect(patch.operations[0]).toMatchObject({ parentNodeId: rootNodeId, nodeId: "runtime-api-thread-group", fields: { "ThreadGroup.num_threads": 7 } });
+    expect(patch.operations[1]?.fields).toMatchObject({ "HTTPSampler.domain": "runtime.example" });
+    expect(patch.operations[2]?.fields).toMatchObject({ "HTTPSampler.path": "/ready" });
+  });
 });
