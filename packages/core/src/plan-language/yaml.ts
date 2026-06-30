@@ -32,6 +32,7 @@ function toYamlValue(value: unknown, depth: number): string {
     }
 
     return Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
       .map(([key, item]) => {
         if (Array.isArray(item) && item.length === 0) {
           return `${indent}${key}: []\n`;
@@ -54,6 +55,10 @@ function formatYamlItem(value: unknown, depth: number): string {
 }
 
 function formatScalar(value: unknown): string {
+  if (value === undefined) {
+    return "null";
+  }
+
   if (typeof value === "string") {
     return JSON.stringify(value);
   }

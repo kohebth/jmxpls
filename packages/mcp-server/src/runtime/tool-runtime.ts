@@ -174,7 +174,11 @@ export class JmxplsRuntime {
     }
     return {
       success: true,
-      data: { equivalent: JSON.stringify(left.document) === JSON.stringify(right.document), left: summarizePlanLanguage(left.document.nodes), right: summarizePlanLanguage(right.document.nodes) }
+      data: {
+        equivalent: comparePlanLanguageDocuments(left.document, right.document),
+        left: summarizePlanLanguage(left.document.nodes),
+        right: summarizePlanLanguage(right.document.nodes)
+      }
     };
   }
   private convertHardcodedHostToVariable(input: ToolCallInput): ToolCallResult { const host = requiredString(input, "host"); const variableName = requiredString(input, "variableName"); return this.withSession(input, (session) => { const operations: SemanticPatchOperation[] = semanticNodes(session).filter((node) => node.role === "sampler" && node.fields.domain === host).map((node) => ({ op: "updateField", nodeId: node.nodeId, fieldPath: "HTTPSampler.domain", value: `\${${variableName}}` })); if (operations.length === 0) throw new Error(`No HTTP sampler domain matched ${host}`); return session.applyPatch(patchWithFlags(input, operations)); }); }
@@ -290,4 +294,24 @@ function validatePlanLanguageDocument(document: unknown): Array<{ code: string; 
   }
 
   return errors;
+}
+
+function comparePlanLanguageDocuments(left: unknown, right: unknown): boolean {
+  return JSON.stringify(normalizePlanLanguage(left)) === JSON.stringify(normalizePlanLanguage(right));
+}
+
+function normalizePlanLanguage(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizePlanLanguage);
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .reduce<Record<string, unknown>>((acc, [key, item]) => {
+        acc[key] = normalizePlanLanguage(item);
+        return acc;
+      }, {});
+  }
+  return value;
 }
