@@ -48,6 +48,7 @@ describe("runs, IO, and templates", () => {
     const registry = createBuiltInTemplateRegistry();
     const patch = registry.get("http_api_baseline")?.instantiate();
     const bearerPatch = registry.get("http_api_login_bearer_token")?.instantiate();
+    const csvPatch = registry.get("csv_driven_login_flow")?.instantiate();
 
     expect(patch?.operations).toHaveLength(4);
     expect(patch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
@@ -55,5 +56,8 @@ describe("runs, IO, and templates", () => {
     expect(bearerPatch?.operations).toHaveLength(6);
     expect(bearerPatch?.operations[2]).toMatchObject({ op: "addNode", nodeId: "template-login-bearer-request", nodeType: "HTTPSamplerProxy" });
     expect(bearerPatch?.operations[3]).toMatchObject({ op: "addNode", parentNodeId: "template-login-bearer-request", nodeType: "JSONPostProcessor" });
+    expect(csvPatch?.operations).toHaveLength(5);
+    expect(csvPatch?.operations[1]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-thread-group", nodeType: "CSVDataSet" });
+    expect(csvPatch?.operations[4]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-request", nodeType: "ResponseAssertion" });
   });
 });
