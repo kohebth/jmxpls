@@ -165,6 +165,48 @@ describe("JmxplsRuntime", () => {
     expect(existsSync(targetPath)).toBe(true);
   });
 
+  it("imports Plan Language from a file path", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-file-"));
+    const inputPath = join(dir, "source-plan-language.json");
+    const targetPath = join(dir, "plan.jmx");
+    writeFileSync(inputPath, JSON.stringify({
+      format: "jmxpls-plan-language",
+      version: 1,
+      mode: "outline",
+      detail: "expanded",
+      name: "imported-from-file",
+      nodes: [{
+        nodeId: "root",
+        role: "testPlan",
+        type: "TestPlan",
+        name: "imported from file",
+        enabled: true,
+        children: [{
+          nodeId: "tg-from-file",
+          role: "threadGroup",
+          type: "ThreadGroup",
+          name: "tg-from-file",
+          enabled: true
+        }]
+      }],
+      warnings: []
+    }));
+
+    const runtime = new JmxplsRuntime();
+    const importResult = await runtime.callTool("import_plan_language", {
+      path: inputPath,
+      targetPath,
+      mode: "patch"
+    });
+
+    expect(importResult.success).toBe(true);
+    const planId = (importResult.data as { planId: string }).planId;
+    const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect(threadGroups.success).toBe(true);
+    expect((threadGroups.data as Array<{ name: string }>).length).toBe(1);
+    expect((threadGroups.data as Array<{ name: string }>)[0]?.name).toBe("tg-from-file");
+  });
+
   it("replaces an applied plan in replace mode", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-"));
     const planPath = join(dir, "minimal.jmx");
@@ -234,6 +276,108 @@ describe("JmxplsRuntime", () => {
     const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect((threadGroups.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
     expect((threadGroups.data as Array<{ name: string; nodeId: string }>)[0]?.name).toBe("replaced");
+  });
+
+  it("merges applied Plan Language while preserving existing nodes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-merge-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = (tree.data as Array<{ nodeId: string }>)[0]?.nodeId;
+    const seeded = await runtime.callTool("add_node", {
+      planId,
+      parentNodeId: rootNodeId,
+      nodeType: "ThreadGroup",
+      fields: { name: "seed", enabled: true, "ThreadGroup.num_threads": 1, "ThreadGroup.ramp_time": 0 }
+    });
+    expect(seeded.success).toBe(true);
+
+    const beforeMerge = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect((beforeMerge.data as Array<{ name: string }>).length).toBe(1);
+
+    const merged = await runtime.callTool("apply_plan_language", {
+      planId,
+      mode: "merge",
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "before",
+        nodes: [{
+          nodeId: "root",
+          role: "testPlan",
+          type: "TestPlan",
+          name: "Minimal Plan",
+          enabled: true,
+          children: [{
+            nodeId: "added",
+            role: "controller",
+            type: "GenericController",
+            name: "added",
+            enabled: true
+          }]
+        }],
+        warnings: []
+      })
+    });
+    expect(merged.success).toBe(true);
+    const afterMerge = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect((afterMerge.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
+    expect((afterMerge.data as Array<{ name: string; nodeId: string }>).map((node) => node.name)).toContain("seed");
+    const controllers = await runtime.callTool("find_nodes", { planId, role: "controller" });
+    expect((controllers.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
+    expect((controllers.data as Array<{ name: string; nodeId: string }>)[0]?.name).toBe("added");
+  });
+
+  it("supports dry-run plan-language application without mutating sessions", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-dry-run-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+
+    const applied = await runtime.callTool("apply_plan_language", {
+      planId,
+      mode: "merge",
+      dryRun: true,
+      text: JSON.stringify({
+        format: "jmxpls-plan-language",
+        version: 1,
+        mode: "outline",
+        detail: "expanded",
+        name: "dryrun",
+        nodes: [{
+          nodeId: "root",
+          role: "testPlan",
+          type: "TestPlan",
+          name: "Minimal Plan",
+          enabled: true,
+          children: [{
+            nodeId: "dry",
+            role: "threadGroup",
+            type: "ThreadGroup",
+            name: "dry",
+            enabled: true
+          }]
+        }],
+        warnings: []
+      })
+    });
+    expect(applied.success).toBe(true);
+
+    const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    expect((threadGroups.data as Array<{ name: string }>).length).toBe(0);
+    expect(readFileSync(planPath, "utf8")).toContain("<TestPlan ");
   });
 
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
