@@ -6,6 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import { atomicWriteFile, backupFile, buildJMeterCliCommand, checkSla, compareJtlMetrics, computeJtlMetrics, createBuiltInTemplateRegistry, parseJtlCsv, renderMetricsReport } from "../src/index.js";
 
+const loadProfileTimers = {
+  constant_load_profile: "ConstantTimer",
+  ramp_load_profile: "PreciseThroughputTimer",
+  spike_load_profile: "SyncTimer",
+  stress_load_profile: "ConstantThroughputTimer",
+  soak_load_profile: "ConstantThroughputTimer"
+};
+
 describe("runs, IO, and templates", () => {
   it("builds allowlisted JMeter commands", () => {
     expect(buildJMeterCliCommand("plan.jmx", "out.jtl").args).toEqual(["-n", "-t", "plan.jmx", "-l", "out.jtl"]);
@@ -59,5 +67,12 @@ describe("runs, IO, and templates", () => {
     expect(csvPatch?.operations).toHaveLength(5);
     expect(csvPatch?.operations[1]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-thread-group", nodeType: "CSVDataSet" });
     expect(csvPatch?.operations[4]).toMatchObject({ op: "addNode", parentNodeId: "template-csv-login-request", nodeType: "ResponseAssertion" });
+    for (const [name, timerType] of Object.entries(loadProfileTimers)) {
+      const operations = registry.get(name)?.instantiate().operations;
+      expect(operations).toHaveLength(5);
+      expect(operations?.[0]).toMatchObject({ op: "addNode", parentNodeId: "root", nodeType: "ThreadGroup" });
+      expect(operations?.[2]).toMatchObject({ op: "addNode", nodeType: "HTTPSamplerProxy" });
+      expect(operations?.[3]).toMatchObject({ op: "addNode", nodeType: timerType });
+    }
   });
 });

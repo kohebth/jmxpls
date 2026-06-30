@@ -1,7 +1,30 @@
+import type { AddNodeOperation } from "../model/patches.js";
 import type { PlanTemplate } from "./registry.js";
 
-export const loadProfileTemplates: PlanTemplate[] = ["constant_load_profile", "ramp_load_profile", "spike_load_profile", "stress_load_profile", "soak_load_profile"].map((name) => ({
-  name,
-  description: `${name} template`,
-  instantiate: () => ({ dryRun: true, operations: [] })
+type TimerSpec = { nodeType: string; guiClass: string; name: string; fields: Record<string, unknown> };
+type LoadProfileSpec = { name: string; title: string; description: string; id: string; users: number; rampSec: number; durationSec: number; timer: TimerSpec };
+
+const profiles: LoadProfileSpec[] = [
+  { name: "constant_load_profile", title: "Constant Load", description: "Steady HTTP load with a fixed pacing timer.", id: "template-constant-load-thread-group", users: 20, rampSec: 60, durationSec: 600, timer: { nodeType: "ConstantTimer", guiClass: "ConstantTimerGui", name: "Fixed pacing", fields: { "ConstantTimer.delay": 500 } } },
+  { name: "ramp_load_profile", title: "Ramp Load", description: "Gradual HTTP ramp with a precise throughput target.", id: "template-ramp-load-thread-group", users: 50, rampSec: 300, durationSec: 900, timer: { nodeType: "PreciseThroughputTimer", guiClass: "TestBeanGUI", name: "Ramp throughput target", fields: { throughput: 300, throughputPeriod: 60, duration: 900 } } },
+  { name: "spike_load_profile", title: "Spike Load", description: "Short HTTP spike coordinated with a synchronizing timer.", id: "template-spike-load-thread-group", users: 100, rampSec: 30, durationSec: 300, timer: { nodeType: "SyncTimer", guiClass: "SyncTimerGui", name: "Spike synchronizer", fields: { groupSize: 50, timeoutInMs: 0 } } },
+  { name: "stress_load_profile", title: "Stress Load", description: "High HTTP stress load with a throughput cap.", id: "template-stress-load-thread-group", users: 200, rampSec: 120, durationSec: 600, timer: { nodeType: "ConstantThroughputTimer", guiClass: "TestBeanGUI", name: "Stress throughput cap", fields: { throughput: 1200, calcMode: 1 } } },
+  { name: "soak_load_profile", title: "Soak Load", description: "Long-running HTTP soak load with moderate throughput.", id: "template-soak-load-thread-group", users: 25, rampSec: 300, durationSec: 14400, timer: { nodeType: "ConstantThroughputTimer", guiClass: "TestBeanGUI", name: "Soak throughput cap", fields: { throughput: 150, calcMode: 1 } } }
+];
+
+export const loadProfileTemplates: PlanTemplate[] = profiles.map((profile) => ({
+  name: profile.name,
+  description: profile.description,
+  instantiate: () => ({ dryRun: true, operations: loadProfileOperations(profile) })
 }));
+
+function loadProfileOperations(profile: LoadProfileSpec): AddNodeOperation[] {
+  const parentNodeId = profile.id;
+  return [
+    { op: "addNode", parentNodeId: "root", nodeId: parentNodeId, nodeType: "ThreadGroup", fields: { name: profile.title, guiClass: "ThreadGroupGui", "ThreadGroup.num_threads": profile.users, "ThreadGroup.ramp_time": profile.rampSec, "ThreadGroup.scheduler": true, "ThreadGroup.duration": profile.durationSec, "LoopController.continue_forever": true, "LoopController.loops": -1 } },
+    { op: "addNode", parentNodeId, nodeType: "ConfigTestElement", fields: { name: "HTTP Request Defaults", guiClass: "HttpDefaultsGui", "HTTPSampler.protocol": "https", "HTTPSampler.domain": "example.com" } },
+    { op: "addNode", parentNodeId, nodeType: "HTTPSamplerProxy", fields: { name: "GET /health", guiClass: "HttpTestSampleGui", "HTTPSampler.method": "GET", "HTTPSampler.path": "/health" } },
+    { op: "addNode", parentNodeId, nodeType: profile.timer.nodeType, fields: { name: profile.timer.name, guiClass: profile.timer.guiClass, ...profile.timer.fields } },
+    { op: "addNode", parentNodeId, nodeType: "ResultCollector", fields: { name: "Summary Report", guiClass: "SummaryReport" } }
+  ];
+}
