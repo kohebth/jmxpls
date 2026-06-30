@@ -102,6 +102,9 @@ Template tools expose built-in semantic patch templates:
 
 - `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.
 - `instantiate_template` retargets top-level template operations to the opened plan root when `planId` is supplied; pass `apply: true` to call `apply_semantic_patch`.
+- Common template inputs include `idPrefix`, `domain`, `protocol`, `port`, `path`, `method`, `threads`, `rampSec`, `rampUpSec`, `threadGroupName`, and `requestName`.
+- Login templates also accept `loginPath`, `loginMethod`, `loginBody`, `usernameVariable`, `passwordVariable`, `tokenVariable`, `tokenJsonPath`, `authenticatedPath`, and `expectedStatus`.
+- Load-profile templates also accept `durationSec`, `delayMs`, `targetThroughput`, `throughputPeriod`, `groupSize`, `timeoutMs`, `calcMode`, and `timerName`.
 - `create_http_api_plan`, `create_login_flow`, `create_bearer_token_flow`, `create_crud_flow`, and `create_csv_driven_flow` are aliases for built-in templates.
 - `prepare_plan_for_ci` forwards to GUI-listener disabling.
 - `convert_hardcoded_values_to_variables` currently supports host-to-variable conversion through `host` and `variableName`.
@@ -109,9 +112,9 @@ Template tools expose built-in semantic patch templates:
 Example:
 
 ```json
-{"name":"instantiate_template","arguments":{"name":"http_api_baseline","planId":"<planId>","dryRun":true,"apply":true}}
+{"name":"instantiate_template","arguments":{"name":"http_api_baseline","planId":"<planId>","domain":"api.example.test","path":"/ready","threads":25,"dryRun":true,"apply":true}}
 ```
 
 ```json
-{"name":"instantiate_template","arguments":{"name":"soak_load_profile","planId":"<planId>","dryRun":true,"apply":true}}
+{"name":"instantiate_template","arguments":{"name":"soak_load_profile","planId":"<planId>","domain":"api.example.test","durationSec":14400,"targetThroughput":200,"dryRun":true,"apply":true}}
 ```
