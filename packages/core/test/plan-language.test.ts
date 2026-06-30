@@ -35,6 +35,20 @@ describe("Plan Language", () => {
     expect(parsed.document.name).toBe("Minimal Plan");
   });
 
+  it("omits undefined YAML fields", () => {
+    const yaml = serializePlanLanguage({
+      format: "jmxpls-plan-language",
+      version: 1,
+      mode: "outline",
+      name: "Minimal Plan",
+      nodes: [],
+      warnings: [],
+      detail: undefined
+    }, "yaml");
+
+    expect(yaml.includes("detail:")).toBe(false);
+  });
+
   it("round-trips through JSON", () => {
     expect(roundTripPlanLanguage(semanticPlan()).equivalent).toBe(true);
   });
