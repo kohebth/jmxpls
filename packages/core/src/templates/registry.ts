@@ -1,9 +1,11 @@
 import type { SemanticPatch } from "../model/patches.js";
 
+export type TemplateInput = Record<string, unknown>;
+
 export type PlanTemplate = {
   name: string;
   description: string;
-  instantiate: () => SemanticPatch;
+  instantiate: (input?: TemplateInput) => SemanticPatch;
 };
 
 export class TemplateRegistry {

@@ -61,6 +61,12 @@ describe("runs, IO, and templates", () => {
     expect(patch?.operations).toHaveLength(4);
     expect(patch?.operations[0]).toMatchObject({ op: "addNode", nodeType: "ThreadGroup" });
     expect(patch?.operations[2]).toMatchObject({ op: "addNode", parentNodeId: "template-http-api-thread-group", nodeType: "HTTPSamplerProxy" });
+    expect(registry.get("http_api_baseline")?.instantiate({ idPrefix: "custom-api", domain: "api.internal", protocol: "http", port: 8080, path: "/ready", method: "HEAD", threads: 3, rampSec: 5, loops: 2 }).operations).toEqual([
+      expect.objectContaining({ op: "addNode", nodeId: "custom-api-thread-group", fields: expect.objectContaining({ "ThreadGroup.num_threads": 3, "ThreadGroup.ramp_time": 5, "LoopController.loops": 2 }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-api-thread-group", fields: expect.objectContaining({ "HTTPSampler.protocol": "http", "HTTPSampler.domain": "api.internal", "HTTPSampler.port": 8080 }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-api-thread-group", fields: expect.objectContaining({ name: "HEAD /ready", "HTTPSampler.method": "HEAD", "HTTPSampler.path": "/ready" }) }),
+      expect.objectContaining({ op: "addNode", parentNodeId: "custom-api-thread-group", nodeType: "ResultCollector" })
+    ]);
     expect(bearerPatch?.operations).toHaveLength(6);
     expect(bearerPatch?.operations[2]).toMatchObject({ op: "addNode", nodeId: "template-login-bearer-request", nodeType: "HTTPSamplerProxy" });
     expect(bearerPatch?.operations[3]).toMatchObject({ op: "addNode", parentNodeId: "template-login-bearer-request", nodeType: "JSONPostProcessor" });

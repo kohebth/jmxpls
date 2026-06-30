@@ -44,7 +44,7 @@ export class TemplateToolRuntime {
     if (!template) {
       return { success: false, error: `Unknown template: ${name}` };
     }
-    const patch = await retargetTemplatePatch(withPatchFlags(template.instantiate(), input), input, base);
+    const patch = await retargetTemplatePatch(withPatchFlags(template.instantiate(input), input), input, base);
     if (input.apply === true) {
       return await base.callTool("apply_semantic_patch", { planId: requiredString(input, "planId"), patch });
     }
