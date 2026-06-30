@@ -4,6 +4,19 @@ import { numberInput, scalarInput, stringInput } from "./input.js";
 export const httpApiBaselineTemplate: PlanTemplate = {
   name: "http_api_baseline",
   description: "Baseline HTTP API test plan patch.",
+  parameters: [
+    { name: "idPrefix", type: "string", description: "Node ID prefix for generated elements.", defaultValue: "template-http-api" },
+    { name: "domain", type: "string", description: "Default HTTP host.", defaultValue: "example.com" },
+    { name: "protocol", type: "string", description: "Default HTTP protocol.", defaultValue: "https" },
+    { name: "port", type: "stringOrNumber", description: "Optional default HTTP port." },
+    { name: "path", type: "string", description: "Sample request path.", defaultValue: "/health" },
+    { name: "method", type: "string", description: "Sample request method.", defaultValue: "GET" },
+    { name: "threads", type: "number", description: "Thread group user count.", defaultValue: 10 },
+    { name: "rampSec", type: "number", description: "Thread group ramp-up in seconds.", defaultValue: 10 },
+    { name: "loops", type: "number", description: "Loop count for each thread.", defaultValue: 1 },
+    { name: "threadGroupName", type: "string", description: "Generated thread group name.", defaultValue: "HTTP API Users" },
+    { name: "requestName", type: "string", description: "Generated sample request name." }
+  ],
   instantiate: (input = {}) => {
     const idPrefix = stringInput(input, "idPrefix", "template-http-api");
     const threadGroupId = `${idPrefix}-thread-group`;

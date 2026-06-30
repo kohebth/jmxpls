@@ -2,9 +2,18 @@ import type { SemanticPatch } from "../model/patches.js";
 
 export type TemplateInput = Record<string, unknown>;
 
+export type TemplateParameter = {
+  name: string;
+  type: "string" | "number" | "boolean" | "stringOrNumber";
+  description: string;
+  defaultValue?: string | number | boolean;
+  required?: boolean;
+};
+
 export type PlanTemplate = {
   name: string;
   description: string;
+  parameters?: TemplateParameter[];
   instantiate: (input?: TemplateInput) => SemanticPatch;
 };
 
