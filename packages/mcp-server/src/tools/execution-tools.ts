@@ -6,6 +6,7 @@ const BOOLEAN = { type: "boolean" };
 const RUN_ID = { runId: STRING };
 
 const EXECUTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
+  get_jmeter_environment: objectSchema({}),
   run_jmeter: objectSchema({ planPath: STRING, path: STRING, jtlPath: STRING, resultPath: STRING, jmeterExecutable: STRING }, [], { anyOf: [{ required: ["planPath"] }, { required: ["path"] }] }),
   stop_run: objectSchema(RUN_ID, ["runId"]),
   get_run_status: objectSchema(RUN_ID, ["runId"]),

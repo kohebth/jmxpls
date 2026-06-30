@@ -54,6 +54,11 @@ describe("JmxplsRuntime", () => {
     delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
     try {
       const runtime = new JmxplsRuntime();
+      const environment = await runtime.callTool("get_jmeter_environment");
+      expect(environment.success).toBe(true);
+      expect((environment.data as { bridgeConfigured: boolean }).bridgeConfigured).toBe(false);
+      expect((environment.data as { diagnostics: Array<{ code: string }> }).diagnostics[0]?.code).toBe("JMX_JMETER_BRIDGE_NOT_CONFIGURED");
+
       const result = await runtime.callTool("validate_with_jmeter", { path: "plan.jmx", strict: true });
 
       expect(result.success).toBe(true);
@@ -80,7 +85,8 @@ describe("JmxplsRuntime", () => {
       "const rl = createInterface({ input: process.stdin });",
       "rl.on(\"line\", (line) => {",
       "  const request = JSON.parse(line);",
-      "  process.stdout.write(JSON.stringify({ id: request.id, success: true, data: { path: request.path, valid: true }, diagnostics: [] }) + \"\\n\");",
+      "  const data = request.command === \"environment\" ? { javaVersion: \"stub-java\", jmeterConfigured: true } : { path: request.path, valid: true };",
+      "  process.stdout.write(JSON.stringify({ id: request.id, success: true, data, diagnostics: [] }) + \"\\n\");",
       "});"
     ].join("\n"));
     chmodSync(scriptPath, 0o755);
@@ -89,6 +95,12 @@ describe("JmxplsRuntime", () => {
     process.env.JMXPLS_JAVA_COMMAND = scriptPath;
     try {
       const runtime = new JmxplsRuntime();
+      const environment = await runtime.callTool("get_jmeter_environment");
+      expect(environment.success).toBe(true);
+      expect((environment.data as { bridgeConfigured: boolean }).bridgeConfigured).toBe(true);
+      expect((environment.data as { valid: boolean }).valid).toBe(true);
+      expect((environment.data as { environment: { javaVersion: string } }).environment.javaVersion).toBe("stub-java");
+
       const result = await runtime.callTool("validate_with_jmeter", { path: "plan.jmx", mode: "load" });
 
       expect(result.success).toBe(true);

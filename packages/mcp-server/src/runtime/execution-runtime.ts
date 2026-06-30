@@ -72,6 +72,7 @@ export class JmxplsRuntime extends BaseRuntime {
   private async callExecutionTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
     try {
       switch (name) {
+        case "get_jmeter_environment": return await this.getJMeterEnvironment();
         case "run_jmeter": return this.runJMeter(input);
         case "stop_run": return this.stopRun(input);
         case "get_run_status": return this.getRunStatus(input);
@@ -133,6 +134,23 @@ export class JmxplsRuntime extends BaseRuntime {
       return { success: true, data: { path, mode: result.mode, jmeterBacked: true, valid: result.valid, diagnostics: result.diagnostics } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown JMeter bridge validation error" };
+    } finally {
+      bridge.close();
+    }
+  }
+
+  private async getJMeterEnvironment(): Promise<ToolCallResult> {
+    const options = bridgeOptionsFromEnv();
+    if (!options) {
+      return bridgeEnvironmentNotConfigured();
+    }
+
+    const bridge = new BridgeClient(options);
+    try {
+      const response = await bridge.environment();
+      return { success: true, data: { bridgeConfigured: true, valid: response.success, environment: response.data ?? null, diagnostics: response.diagnostics } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Unknown JMeter bridge environment error" };
     } finally {
       bridge.close();
     }
@@ -274,6 +292,23 @@ function bridgeNotConfigured(path: string, mode: JMeterValidationMode, strict: b
     fixSuggestion: "Set JMXPLS_JAVA_BRIDGE_JAR to the Java bridge executable jar before using path-based JMeter validation."
   }];
   return { success: true, data: { path, mode, jmeterBacked: false, valid: severity !== "error", diagnostics } };
+}
+
+function bridgeEnvironmentNotConfigured(): ToolCallResult {
+  return {
+    success: true,
+    data: {
+      bridgeConfigured: false,
+      valid: false,
+      environment: null,
+      diagnostics: [{
+        code: "JMX_JMETER_BRIDGE_NOT_CONFIGURED",
+        severity: "warning",
+        message: "JMeter bridge environment is not available because the Java bridge is not configured.",
+        fixSuggestion: "Set JMXPLS_JAVA_BRIDGE_JAR to the Java bridge executable jar before probing the JMeter environment."
+      }]
+    }
+  };
 }
 
 function bridgeResponseData(path: string, mode: JMeterValidationMode, response: BridgeResponse<{ path: string; valid?: boolean; reason?: string }>): Record<string, unknown> {
