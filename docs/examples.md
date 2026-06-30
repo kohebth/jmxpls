@@ -2,6 +2,12 @@
 
 Open a plan, read `get_plan_language` in outline mode, query target nodes, apply a dry-run semantic patch, validate, save atomically, run JMeter in CLI mode, then analyze the JTL output.
 
+Inspect template metadata first to avoid guessing fields for a new template:
+
+```json
+{"name":"get_template","arguments":{"name":"http_api_baseline"}}
+```
+
 To scaffold a basic HTTP API load-test flow in an open plan, dry-run the built-in baseline template first:
 
 ```json

@@ -101,6 +101,9 @@ Template tools expose built-in semantic patch templates:
 - `constant_load_profile`, `ramp_load_profile`, `spike_load_profile`, `stress_load_profile`, and `soak_load_profile` create complete HTTP starter flows with scheduled thread groups and profile-specific timers.
 
 - `list_templates`, `get_template`, and `instantiate_template` inspect and instantiate templates.
+- `list_templates` returns each template with `name`, `description`, and `parameters`.
+- `get_template` returns `name`, `description`, `parameters`, and the rendered `patch`.
+- Each parameter entry includes `name`, `type` (`string` or `number`), and optional `defaultValue` / `description`.
 - `instantiate_template` retargets top-level template operations to the opened plan root when `planId` is supplied; pass `apply: true` to call `apply_semantic_patch`.
 - Common template inputs include `idPrefix`, `domain`, `protocol`, `port`, `path`, `method`, `threads`, `rampSec`, `rampUpSec`, `threadGroupName`, and `requestName`.
 - Login templates also accept `loginPath`, `loginMethod`, `loginBody`, `usernameVariable`, `passwordVariable`, `tokenVariable`, `tokenJsonPath`, `authenticatedPath`, and `expectedStatus`.
@@ -110,6 +113,14 @@ Template tools expose built-in semantic patch templates:
 - `convert_hardcoded_values_to_variables` currently supports host-to-variable conversion through `host` and `variableName`.
 
 Example:
+
+```json
+{"name":"list_templates","arguments":{}}
+```
+
+```json
+{"name":"get_template","arguments":{"name":"http_api_baseline"}}
+```
 
 ```json
 {"name":"instantiate_template","arguments":{"name":"http_api_baseline","planId":"<planId>","domain":"api.example.test","path":"/ready","threads":25,"dryRun":true,"apply":true}}
