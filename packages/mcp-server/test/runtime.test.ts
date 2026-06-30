@@ -74,6 +74,17 @@ describe("JmxplsRuntime", () => {
 
     const invalidYaml = await runtime.callTool("validate_plan_language", { text: "plan: [ " });
     expect(invalidYaml.success).toBe(false);
+
+    const invalidSchema = await runtime.callTool("validate_plan_language", { text: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}" });
+    expect(invalidSchema.success).toBe(true);
+    expect((invalidSchema.data as { valid: boolean }).valid).toBe(false);
+    expect((invalidSchema.data as { diagnostics: Array<{ code: string }> }).diagnostics).toContainEqual({ code: "PLANG_SCHEMA_INVALID", message: expect.any(String), field: "format" });
+
+    const explainFailure = await runtime.callTool("explain_plan_language", { text: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}" });
+    expect(explainFailure.success).toBe(false);
+
+    const compareFailure = await runtime.callTool("compare_plan_language", { left: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}", right: "{\"format\":\"invalid\",\"version\":2,\"mode\":\"outline\",\"name\":\"x\",\"nodes\":[],\"warnings\":[]}" });
+    expect(compareFailure.success).toBe(false);
   });
 
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
