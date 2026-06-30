@@ -51,7 +51,7 @@ function applyOperation(document: JmxDocument, operation: SemanticPatchOperation
     case "deleteNode":
       return deleteNode(document.root.hashTree, operation.nodeId);
     case "addNode":
-      return addNode(document.root.hashTree, operation.parentNodeId, operation.nodeType, operation.fields ?? {}, operation.index);
+      return addNode(document.root.hashTree, operation.parentNodeId, operation.nodeType, operation.fields ?? {}, operation.index, operation.nodeId);
     case "cloneNode":
       return cloneNode(document.root.hashTree, operation.nodeId, operation.toParentNodeId, operation.index);
     case "moveNode":
@@ -104,9 +104,9 @@ function deleteNode(tree: HashTreeNode, nodeId: string): boolean {
   return tree.pairs.some((pair) => deleteNode(pair.children, nodeId));
 }
 
-function addNode(tree: HashTreeNode, parentNodeId: string, nodeType: string, fields: Record<string, unknown>, index?: number): boolean {
+function addNode(tree: HashTreeNode, parentNodeId: string, nodeType: string, fields: Record<string, unknown>, index?: number, nodeId: string = randomUUID()): boolean {
   const parent = parentNodeId === "root" ? tree : findPair(tree, parentNodeId)?.children;
-  if (!parent || !isValidInsertIndex(parent, index)) {
+  if (!parent || findPair(tree, nodeId) || !isValidInsertIndex(parent, index)) {
     return false;
   }
 
@@ -135,7 +135,7 @@ function addNode(tree: HashTreeNode, parentNodeId: string, nodeType: string, fie
   const pair: JmxPairNode = {
     kind: "pair",
     path,
-    nodeId: randomUUID(),
+    nodeId,
     element,
     children: {
       kind: "hashTree",
