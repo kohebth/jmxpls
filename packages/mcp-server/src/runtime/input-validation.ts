@@ -25,6 +25,14 @@ const PARENT_ID_ALIASES: FieldRule[] = [{ name: "parentNodeId", type: "string" }
 const NODE_TYPE_ALIASES: FieldRule[] = [{ name: "nodeType", type: "string" }, { name: "type", type: "string" }];
 const PATCH_OPTIONALS: FieldRule[] = [{ name: "dryRun", type: "boolean" }, { name: "validate", type: "boolean" }];
 const PLAN_LANGUAGE_SOURCE_OPTIONAL: FieldRule[] = [{ name: "text", type: "string" }, { name: "path", type: "string" }];
+const PLAN_LANGUAGE_PROJECTION_OPTIONALS: FieldRule[] = [
+  { name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] },
+  { name: "detail", type: "string", enum: ["compact", "expanded", "lossless-references", "raw-linked"] },
+  { name: "redaction", type: "string", enum: ["none", "standard", "strict"] },
+  { name: "subtreeNodeId", type: "string" },
+  { name: "nodeId", type: "string" },
+  { name: "format", type: "string", enum: ["object", "json", "yaml"] }
+];
 const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
   { name: "mode", type: "string", enum: ["replace", "merge", "patch"] },
   ...PATCH_OPTIONALS
@@ -89,8 +97,8 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   find_by_request: { required: [PLAN_ID], optional: [{ name: "method", type: "string" }, { name: "path", type: "string" }, { name: "pathContains", type: "string" }, { name: "domain", type: "string" }, { name: "domainContains", type: "string" }] },
   find_disabled_nodes: { required: [PLAN_ID] },
   explain_execution_flow: { required: [PLAN_ID] },
-  get_plan_language: { required: [PLAN_ID], optional: [{ name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] }, { name: "format", type: "string", enum: ["object", "json", "yaml"] }] },
-  export_plan_language: { required: [PLAN_ID], optional: [{ name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] }, { name: "format", type: "string", enum: ["object", "json", "yaml"] }] },
+  get_plan_language: { required: [PLAN_ID], optional: PLAN_LANGUAGE_PROJECTION_OPTIONALS },
+  export_plan_language: { required: [PLAN_ID], optional: PLAN_LANGUAGE_PROJECTION_OPTIONALS },
   validate_plan_language: { required: [{ name: "text", type: "string" }] },
   parse_plan_language: { required: [{ name: "text", type: "string" }] },
   import_plan_language: { requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: [{ name: "targetPath", type: "string" }, ...PLAN_LANGUAGE_IMPORT_OPTIONALS] },

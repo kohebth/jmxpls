@@ -166,6 +166,36 @@ describe("JmxplsRuntime", () => {
     expect(badSyntax.success).toBe(false);
   });
 
+  it("projects Plan Language with subtree scope and redaction controls", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-plan-language-options-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+
+    const added = await runtime.callTool("add_node", {
+      planId,
+      parentNodeId: rootNodeId,
+      nodeType: "ThreadGroup",
+      fields: { name: "Scoped Users", enabled: true, password: "secret-value" }
+    });
+    expect(added.success).toBe(true);
+    const nodes = await runtime.callTool("find_nodes", { planId, name: "Scoped Users", match: "exact" });
+    const scopedNodeId = ((nodes.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+
+    const redacted = await runtime.callTool("get_plan_language", { planId, mode: "semantic", subtreeNodeId: scopedNodeId });
+    expect((redacted.data as { nodes: Array<{ nodeId: string; fields: Record<string, unknown> }> }).nodes[0]?.nodeId).toBe(scopedNodeId);
+    expect((redacted.data as { nodes: Array<{ fields: Record<string, unknown> }> }).nodes[0]?.fields.password).toBe("<redacted>");
+
+    const unredacted = await runtime.callTool("get_plan_language", { planId, mode: "semantic", nodeId: scopedNodeId, redaction: "none" });
+    expect((unredacted.data as { nodes: Array<{ fields: Record<string, unknown> }> }).nodes[0]?.fields.password).toBe("secret-value");
+  });
+
   it("imports Plan Language text into a new target plan", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-"));
     const targetPath = join(dir, "plan.jmx");
