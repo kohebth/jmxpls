@@ -74,6 +74,9 @@ export class JsonRpcMcpSession {
   }
 
   lifecycleError(request: JsonRpcRequest): { code: number; message: string } | undefined {
+    if (request.method === "ping") {
+      return undefined;
+    }
     if (request.method === "initialize") {
       return this.state === "new" ? undefined : { code: INVALID_REQUEST, message: "Server is already initialized" };
     }
@@ -212,7 +215,7 @@ function handleNotification(request: JsonRpcRequest): void {
 
 function initializeResult(params: Record<string, unknown> | undefined): Record<string, unknown> {
   return {
-    protocolVersion: typeof params?.protocolVersion === "string" ? params.protocolVersion : MCP_PROTOCOL_VERSION,
+    protocolVersion: params?.protocolVersion === MCP_PROTOCOL_VERSION ? params.protocolVersion : MCP_PROTOCOL_VERSION,
     capabilities: {
       prompts: {},
       resources: {},

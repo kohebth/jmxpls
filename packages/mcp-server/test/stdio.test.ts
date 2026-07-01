@@ -49,6 +49,19 @@ describe("stdio JSON-RPC MCP transport", () => {
     });
   });
 
+  it("negotiates unsupported protocol versions to the supported MCP version", async () => {
+    const response = await handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "init",
+      method: "initialize",
+      params: { protocolVersion: "1900-01-01" }
+    }), server, runtime);
+
+    expect(response?.result).toEqual(expect.objectContaining({
+      protocolVersion: "2025-06-18"
+    }));
+  });
+
   it("does not respond to initialized notifications", async () => {
     await expect(handleJsonRpcMessage(JSON.stringify({
       jsonrpc: "2.0",
@@ -195,6 +208,12 @@ describe("stateful stdio MCP lifecycle", () => {
   it("rejects tools before initialize and initialized notification", async () => {
     const session = new JsonRpcMcpSession(server, runtime);
 
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ping", method: "ping" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "ping",
+      result: {}
+    });
+
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }))).resolves.toEqual({
       jsonrpc: "2.0",
       id: "tools",
@@ -211,6 +230,12 @@ describe("stateful stdio MCP lifecycle", () => {
       jsonrpc: "2.0",
       id: "blocked",
       error: { code: -32002, message: "Server is not initialized" }
+    });
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ping2", method: "ping" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "ping2",
+      result: {}
     });
 
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))).resolves.toBeUndefined();
