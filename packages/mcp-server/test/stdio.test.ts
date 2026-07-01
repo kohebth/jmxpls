@@ -225,6 +225,18 @@ describe("stdio JSON-RPC MCP transport", () => {
     ]);
   });
 
+  it("rejects MCP response messages with null ids", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      result: {}
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "id must be a string or number when present" }
+    });
+  });
+
   it("returns an invalid request error for empty JSON-RPC batches", async () => {
     await expect(handleJsonRpcMessage("[]", server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",

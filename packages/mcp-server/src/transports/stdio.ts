@@ -367,11 +367,11 @@ function validateRequest(value: unknown): { code: number; message: string } | un
   if (value.jsonrpc !== JSONRPC_VERSION) {
     return { code: INVALID_REQUEST, message: "jsonrpc must be \"2.0\"" };
   }
-  if (typeof value.method !== "string" || value.method.length === 0) {
-    return { code: INVALID_REQUEST, message: "method must be a non-empty string" };
-  }
   if ("id" in value && typeof value.id !== "string" && typeof value.id !== "number") {
     return { code: INVALID_REQUEST, message: "id must be a string or number when present" };
+  }
+  if (typeof value.method !== "string" || value.method.length === 0) {
+    return { code: INVALID_REQUEST, message: "method must be a non-empty string" };
   }
   if (value.params !== undefined && !isObject(value.params)) {
     return { code: INVALID_PARAMS, message: "params must be an object when present" };
@@ -383,7 +383,7 @@ function isJsonRpcResponse(value: unknown): boolean {
   if (!isObject(value) || value.jsonrpc !== JSONRPC_VERSION || !("id" in value) || "method" in value) {
     return false;
   }
-  const hasValidId = value.id === null || typeof value.id === "string" || typeof value.id === "number";
+  const hasValidId = typeof value.id === "string" || typeof value.id === "number";
   if (!hasValidId) {
     return false;
   }
