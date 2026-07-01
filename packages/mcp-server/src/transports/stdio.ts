@@ -313,7 +313,7 @@ function promptGetResult(server: ServerLike, params: Record<string, unknown> | u
   if (!prompt) {
     throw new RpcError(INVALID_PARAMS, `Unknown prompt: ${name}`);
   }
-  const args = asObject(params?.arguments);
+  const args = promptArguments(params?.arguments);
   return {
     description: prompt.description,
     messages: [{
@@ -324,6 +324,14 @@ function promptGetResult(server: ServerLike, params: Record<string, unknown> | u
       }
     }]
   };
+}
+
+function promptArguments(value: unknown): Record<string, string> {
+  const args = asObject(value);
+  if (Object.values(args).some((item) => typeof item !== "string")) {
+    throw new RpcError(INVALID_PARAMS, "prompt arguments must be string values");
+  }
+  return args as Record<string, string>;
 }
 
 function validateRequest(value: unknown): { code: number; message: string } | undefined {

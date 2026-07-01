@@ -270,6 +270,19 @@ describe("stdio JSON-RPC MCP transport", () => {
     expect((prompt?.result as { messages: Array<{ content: { type: string; text: string } }> }).messages[0]?.content.type).toBe("text");
   });
 
+  it("rejects non-string prompt arguments", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "prompt-args",
+      method: "prompts/get",
+      params: { name: "jmeter_plan_review", arguments: { planId: 123 } }
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "prompt-args",
+      error: { code: -32602, message: "prompt arguments must be string values" }
+    });
+  });
+
   it("returns JSON-RPC errors for malformed or invalid requests", async () => {
     await expect(handleJsonRpcMessage("{", server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",
