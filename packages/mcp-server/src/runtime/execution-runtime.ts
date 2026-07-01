@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -96,7 +97,7 @@ export class JmxplsRuntime extends BaseRuntime {
     try {
       switch (name) {
         case "get_jmeter_environment": return await this.getJMeterEnvironment();
-        case "run_jmeter": return this.runJMeter(input);
+        case "run_jmeter": return await this.runJMeter(input);
         case "stop_run": return this.stopRun(input);
         case "get_run_status": return this.getRunStatus(input);
         case "get_run_logs": return this.getRunLogs(input);
@@ -214,13 +215,21 @@ export class JmxplsRuntime extends BaseRuntime {
     return await super.callTool("apply_semantic_patch", { planId: requiredString(input, "planId"), operations, ...patchFlags(input) });
   }
 
-  private runJMeter(input: ToolCallInput): ToolCallResult {
+  private async runJMeter(input: ToolCallInput): Promise<ToolCallResult> {
     const planPath = requiredPath(input, ["planPath", "path"]);
     const jtlPath = optionalPath(input, ["jtlPath", "resultPath"]) ?? `${planPath}.jtl`;
     const command = buildJMeterCliCommand(planPath, jtlPath, optionalString(input, "jmeterExecutable") ?? "jmeter");
     assertAllowedCommand(command);
     const run = this.runs.create({ command, artifacts: [jtlPath], logs: [`Prepared JMeter command: ${command.executable} ${command.args.join(" ")}`] });
-    return { success: true, data: { run, command, executionMode: "planned" } };
+    if (input.execute !== true) {
+      return { success: true, data: { run, command, executionMode: "planned" } };
+    }
+
+    this.runs.setStatus(run.runId, "running");
+    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    appendProcessLogs(this.runs, run.runId, result);
+    this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
+    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };
   }
 
   private stopRun(input: ToolCallInput): ToolCallResult {
@@ -444,6 +453,27 @@ function assertAllowedCommand(command: JMeterCommand): void {
       throw new Error(`Rejected unsafe JMeter argument: ${arg}`);
     }
   }
+}
+
+type ProcessResult = { exitCode: number; stdout: string; stderr: string };
+
+function executeCommand(command: JMeterCommand, timeoutMs?: number): Promise<ProcessResult> {
+  return new Promise((resolve) => {
+    execFile(command.executable, command.args, { timeout: timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+      const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "number" ? error.code : error ? 1 : 0;
+      resolve({ exitCode: code, stdout: stdout.trim(), stderr: stderr.trim() });
+    });
+  });
+}
+
+function appendProcessLogs(runs: RunManager, runId: string, result: ProcessResult): void {
+  if (result.stdout) {
+    runs.appendLog(runId, `stdout: ${result.stdout}`);
+  }
+  if (result.stderr) {
+    runs.appendLog(runId, `stderr: ${result.stderr}`);
+  }
+  runs.appendLog(runId, `JMeter process exited with code ${result.exitCode}`);
 }
 
 function isAllowedJMeterExecutableName(executable: string): boolean {
