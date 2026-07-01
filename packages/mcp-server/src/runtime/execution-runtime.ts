@@ -265,6 +265,7 @@ export class JmxplsRuntime extends BaseRuntime {
 
     this.runs.setStatus(run.runId, "running");
     const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
     this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
     return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };
@@ -307,6 +308,7 @@ export class JmxplsRuntime extends BaseRuntime {
 
     this.runs.setStatus(run.runId, "running");
     const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
     this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
     return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };

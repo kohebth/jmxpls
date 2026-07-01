@@ -12,6 +12,13 @@ export type RunRecord = {
   createdAt: string;
   updatedAt: string;
   command?: JMeterCommand;
+  process?: RunProcessResult;
+};
+
+export type RunProcessResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
 };
 
 export type CreateRunOptions = {
@@ -75,6 +82,16 @@ export class RunManager {
       return undefined;
     }
     run.artifacts.push(path);
+    run.updatedAt = new Date().toISOString();
+    return run;
+  }
+
+  setProcessResult(runId: string, process: RunProcessResult): RunRecord | undefined {
+    const run = this.runs.get(runId);
+    if (!run) {
+      return undefined;
+    }
+    run.process = process;
     run.updatedAt = new Date().toISOString();
     return run;
   }

@@ -847,6 +847,7 @@ describe("JmxplsRuntime", () => {
     expect((result.data as { executionMode: string; run: { status: string; logs: string[] } }).executionMode).toBe("executed");
     expect((result.data as { run: { status: string } }).run.status).toBe("completed");
     expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: executed-jmeter");
+    expect((result.data as { run: { process: { exitCode: number; stdout: string; stderr: string } } }).run.process).toEqual({ exitCode: 0, stdout: "executed-jmeter", stderr: "" });
     expect(readFileSync(jtlPath, "utf8")).toContain("GET /");
   });
 
@@ -866,6 +867,7 @@ describe("JmxplsRuntime", () => {
     expect((result.data as { run: { status: string; artifacts: string[]; logs: string[] } }).run.status).toBe("completed");
     expect((result.data as { run: { artifacts: string[] } }).run.artifacts).toContain(reportDir);
     expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: report-generated");
+    expect((result.data as { run: { process: { exitCode: number; stdout: string; stderr: string } } }).run.process).toEqual({ exitCode: 0, stdout: "report-generated", stderr: "" });
     expect(readFileSync(join(reportDir, "index.html"), "utf8")).toContain("dashboard");
   });
 
