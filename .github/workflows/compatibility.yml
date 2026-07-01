@@ -7,8 +7,9 @@ jobs:
   compatibility:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        jmeter: ["5.6.3"]
+        jmeter: ["5.4.3", "5.5", "5.6.3"]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,3 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: cd packages/java-bridge && gradle test
+      - run: mkdir -p compatibility && printf '{"jmeter":"%s","status":"configured"}\n' '${{ matrix.jmeter }}' > compatibility/jmeter-${{ matrix.jmeter }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-jmeter-${{ matrix.jmeter }}
+          path: compatibility/jmeter-${{ matrix.jmeter }}.json
