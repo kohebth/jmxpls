@@ -13,6 +13,7 @@ import {
   computeJtlMetrics,
   isAllowedJMeterArg,
   parseJtlCsv,
+  parsePlanLanguage,
   renderMetricsReport,
   RunManager,
   validateWithJMeter,
@@ -20,6 +21,7 @@ import {
   type BridgeResponse,
   type JMeterCommand,
   type JMeterValidationMode,
+  type PlanLanguageNode,
   type SlaThresholds
 } from "@jmxpls/core";
 
@@ -57,6 +59,8 @@ export class JmxplsRuntime extends BaseRuntime {
     if (rawResult) return this.auditResult(name, input, rawResult);
     const bridgeValidationResult = await this.callBridgeValidationTool(name, input);
     if (bridgeValidationResult) return bridgeValidationResult;
+    const planLanguageValidationResult = await this.callPlanLanguageValidationTool(name, input);
+    if (planLanguageValidationResult) return planLanguageValidationResult;
     const catalogResult = await this.catalogTools.callTool(name, input);
     if (catalogResult) return catalogResult;
     const templateResult = await this.templateTools.callTool(name, input, this);
@@ -128,6 +132,40 @@ export class JmxplsRuntime extends BaseRuntime {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown raw tool error" };
     }
+  }
+
+  private async callPlanLanguageValidationTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {
+    if (name !== "validate_plan_language") {
+      return undefined;
+    }
+
+    const result = await super.callTool(name, input);
+    if (!result.success || !isObject(result.data) || result.data.valid !== true) {
+      return result;
+    }
+
+    const parsed = parsePlanLanguage(requiredString(input, "text"));
+    const diagnostics = this.catalogDiagnostics(parsed.document.nodes);
+    return {
+      success: true,
+      data: {
+        ...result.data,
+        valid: diagnostics.length === 0,
+        diagnostics
+      }
+    };
+  }
+
+  private catalogDiagnostics(nodes: PlanLanguageNode[], path = "nodes"): Array<{ code: string; message: string; field: string }> {
+    return nodes.flatMap((node, index) => {
+      const nodePath = `${path}[${index}]`;
+      const current = this.catalogTools.hasType(node.type) ? [] : [{
+        code: "PLANG_CATALOG_UNKNOWN_TYPE",
+        message: `type ${node.type} is not present in the active component catalog.`,
+        field: `${nodePath}.type`
+      }];
+      return [...current, ...this.catalogDiagnostics(node.children ?? [], `${nodePath}.children`)];
+    });
   }
 
   private async callBridgeValidationTool(name: string, input: ToolCallInput): Promise<ToolCallResult | undefined> {

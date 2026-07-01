@@ -43,6 +43,10 @@ export class CatalogToolRuntime {
     }
   }
 
+  hasType(type: string): boolean {
+    return this.findDescriptor(type) !== undefined;
+  }
+
   private loadCatalog(): ToolCallResult {
     this.catalog = loadBuiltInCatalog();
     return { success: true, data: catalogSummary(this.catalog) };

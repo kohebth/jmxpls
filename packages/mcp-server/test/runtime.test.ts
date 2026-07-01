@@ -91,6 +91,47 @@ describe("JmxplsRuntime", () => {
     expect(compareFailure.success).toBe(false);
   });
 
+  it("validates Plan Language node types against the active component catalog", async () => {
+    const text = JSON.stringify({
+      format: "jmxpls-plan-language",
+      version: 1,
+      mode: "outline",
+      detail: "expanded",
+      name: "plugin-plan",
+      nodes: [{
+        nodeId: "root",
+        role: "testPlan",
+        type: "TestPlan",
+        name: "plugin plan",
+        enabled: true,
+        children: [{
+          nodeId: "plugin",
+          role: "sampler",
+          type: "PluginSampler",
+          name: "plugin",
+          enabled: true
+        }]
+      }],
+      warnings: []
+    });
+
+    const runtime = new JmxplsRuntime();
+    const unknown = await runtime.callTool("validate_plan_language", { text });
+    expect(unknown.success).toBe(true);
+    expect((unknown.data as { valid: boolean }).valid).toBe(false);
+    expect((unknown.data as { diagnostics: Array<{ code: string; field: string }> }).diagnostics).toContainEqual(expect.objectContaining({ code: "PLANG_CATALOG_UNKNOWN_TYPE", field: "nodes[0].children[0].type" }));
+
+    await runtime.callTool("import_component_catalog", {
+      catalog: {
+        version: 1,
+        source: "dynamic",
+        components: [{ type: "PluginSampler", role: "sampler", displayName: "Plugin Sampler", xmlTags: ["PluginSampler"], testClasses: ["PluginSampler"], guiClasses: ["PluginGui"], fields: [] }]
+      }
+    });
+    const known = await runtime.callTool("validate_plan_language", { text });
+    expect((known.data as { valid: boolean }).valid).toBe(true);
+  });
+
   it("parses Plan Language text and recursively validates node structure", async () => {
     const runtime = new JmxplsRuntime();
     const parse = await runtime.callTool("parse_plan_language", {
