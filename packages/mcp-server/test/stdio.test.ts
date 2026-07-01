@@ -98,10 +98,14 @@ describe("stdio JSON-RPC MCP transport", () => {
     expect((tools?.result as { tools: unknown[] }).tools.length).toBeGreaterThan(0);
 
     const resources = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "resources", method: "resources/list" }), server, runtime);
-    expect((resources?.result as { resources: Array<{ uri: string }> }).resources.some((resource) => resource.uri === "jmxpls://plans")).toBe(true);
+    const listedResources = (resources?.result as { resources: Array<{ uri: string; uriTemplate?: string }> }).resources;
+    expect(listedResources.some((resource) => resource.uri === "jmxpls://plans")).toBe(true);
+    expect(listedResources.every((resource) => !resource.uri.includes("{") && resource.uriTemplate === undefined)).toBe(true);
 
     const templates = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "templates", method: "resources/templates/list" }), server, runtime);
-    expect((templates?.result as { resourceTemplates: Array<{ uriTemplate: string }> }).resourceTemplates.some((resource) => resource.uriTemplate === "jmxpls://plans/{planId}/summary")).toBe(true);
+    const listedTemplates = (templates?.result as { resourceTemplates: Array<{ uriTemplate: string }> }).resourceTemplates;
+    expect(listedTemplates.some((resource) => resource.uriTemplate === "jmxpls://plans/{planId}/summary")).toBe(true);
+    expect(listedTemplates.every((resource) => resource.uriTemplate.includes("{"))).toBe(true);
 
     const prompts = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "prompts", method: "prompts/list" }), server, runtime);
     expect((prompts?.result as { prompts: Array<{ name: string; content?: string }> }).prompts.find((prompt) => prompt.name === "jmeter_plan_review")?.content).toBeUndefined();

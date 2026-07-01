@@ -192,9 +192,9 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
     case "tools/list":
       return { tools: server.tools };
     case "resources/list":
-      return { resources: server.resources.map(({ uriTemplate, ...resource }) => ({ uri: uriTemplate, ...resource })) };
+      return { resources: concreteResources(server.resources) };
     case "resources/templates/list":
-      return { resourceTemplates: server.resources };
+      return { resourceTemplates: resourceTemplates(server.resources) };
     case "prompts/list":
       return { prompts: server.prompts.map((prompt) => ({ name: prompt.name, description: prompt.description, arguments: prompt.arguments ?? [] })) };
     case "tools/call":
@@ -229,6 +229,18 @@ function initializeResult(params: Record<string, unknown> | undefined): Record<s
     },
     instructions: "Use compact Plan Language resources and semantic tools before requesting raw JMX."
   };
+}
+
+function concreteResources(resources: ServerLike["resources"]): Array<{ uri: string; name: string; description: string }> {
+  return resources.filter((resource) => !isTemplatedUri(resource.uriTemplate)).map(({ uriTemplate, ...resource }) => ({ uri: uriTemplate, ...resource }));
+}
+
+function resourceTemplates(resources: ServerLike["resources"]): ServerLike["resources"] {
+  return resources.filter((resource) => isTemplatedUri(resource.uriTemplate));
+}
+
+function isTemplatedUri(uri: string): boolean {
+  return uri.includes("{");
 }
 
 function toolCallResult(result: { success: boolean; data?: unknown; error?: string }): Record<string, unknown> {
