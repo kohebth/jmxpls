@@ -24,4 +24,14 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
-      - run: cd packages/java-bridge && gradle test
+      - run: cd packages/java-bridge && gradle build
+      - run: mkdir -p packages/mcp-server/java-bridge dist/release
+      - run: cp packages/java-bridge/build/libs/jmxpls-java-bridge-0.0.0.jar packages/mcp-server/java-bridge/jmxpls-java-bridge.jar
+      - run: pnpm --dir packages/core pack --pack-destination ../../dist/release
+      - run: pnpm --dir packages/mcp-server pack --pack-destination ../../dist/release
+      - run: cp packages/java-bridge/build/libs/jmxpls-java-bridge-0.0.0.jar dist/release/
+      - run: sha256sum dist/release/* > dist/release/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jmxpls-release
+          path: dist/release/

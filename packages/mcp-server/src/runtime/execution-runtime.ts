@@ -1,6 +1,8 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   BridgeClient,
@@ -348,7 +350,7 @@ async function checkJtlSla(input: ToolCallInput): Promise<ToolCallResult> {
 }
 
 function bridgeOptionsFromEnv(): BridgeClientOptions | undefined {
-  const jarPath = process.env.JMXPLS_JAVA_BRIDGE_JAR;
+  const jarPath = process.env.JMXPLS_JAVA_BRIDGE_JAR ?? bundledBridgeJarPath();
   if (!jarPath) {
     return undefined;
   }
@@ -358,6 +360,12 @@ function bridgeOptionsFromEnv(): BridgeClientOptions | undefined {
     ...(process.env.JMXPLS_JAVA_COMMAND ? { javaCommand: process.env.JMXPLS_JAVA_COMMAND } : {}),
     ...(timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeoutMs } : {})
   };
+}
+
+function bundledBridgeJarPath(): string | undefined {
+  const runtimeDir = dirname(fileURLToPath(import.meta.url));
+  const candidate = join(runtimeDir, "../../java-bridge/jmxpls-java-bridge.jar");
+  return existsSync(candidate) ? candidate : undefined;
 }
 
 function validationMode(input: ToolCallInput): JMeterValidationMode {

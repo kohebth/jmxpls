@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+.git/
+coverage/
+
+packages/*/dist/
+packages/java-bridge/.gradle/
+packages/java-bridge/build/
+
+*.log
+.env
+.env.*
