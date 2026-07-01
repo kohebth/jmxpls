@@ -82,7 +82,7 @@ Raw tools are reserved for unknown/plugin nodes and low-level recovery work. Pre
 - `add_raw_element` forwards to `add_node` with caller-provided `nodeType` and `fields`, with validation enabled.
 - `update_raw_property` forwards to `update_node_field` with validation enabled; use `dryRun: true` first for risky edits.
 - `replace_raw_element` applies a field-by-field semantic patch from a provided `fields` object with validation enabled.
-- `validate_raw_patch` checks raw patch shape before applying it.
+- `validate_raw_patch` checks raw patch operation names and required fields before applying them.
 - `generate_raw_template` creates a starter field object for plugin/custom elements.
 
 ## Catalog Tools

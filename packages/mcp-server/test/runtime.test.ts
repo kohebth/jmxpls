@@ -32,6 +32,10 @@ describe("JmxplsRuntime", () => {
     expect((rawTemplate.data as { fields: { guiClass: string } }).fields.guiClass).toBe("CustomGui");
     const rawPatch = await runtime.callTool("validate_raw_patch", { operations: [{ op: "updateField", nodeId, fieldPath: "name", value: "raw" }] });
     expect((rawPatch.data as { valid: boolean }).valid).toBe(true);
+    const invalidRawPatch = await runtime.callTool("validate_raw_patch", { operations: [{ op: "updateField", nodeId }, { op: "breakHashTree", nodeId }] });
+    expect((invalidRawPatch.data as { valid: boolean }).valid).toBe(false);
+    expect((invalidRawPatch.data as { diagnostics: Array<{ code: string; field?: string }> }).diagnostics).toContainEqual(expect.objectContaining({ code: "JMX_RAW_PATCH_INVALID_OPERATION", field: "operations[0].fieldPath" }));
+    expect((invalidRawPatch.data as { diagnostics: Array<{ code: string; field?: string }> }).diagnostics).toContainEqual(expect.objectContaining({ code: "JMX_RAW_PATCH_UNSUPPORTED_OPERATION", field: "operations[1].op" }));
     const rawUpdate = await runtime.callTool("update_raw_property", { planId, nodeId, propertyPath: "name", value: "Dry Run Raw Name", dryRun: true });
     expect(rawUpdate.success).toBe(true);
 

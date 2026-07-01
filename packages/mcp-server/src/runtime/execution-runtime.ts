@@ -481,8 +481,32 @@ function rawUpdateInput(input: ToolCallInput): ToolCallInput {
 
 function validateRawPatch(input: ToolCallInput): ToolCallResult {
   const operations = Array.isArray(input.operations) ? input.operations : isObject(input.patch) && Array.isArray(input.patch.operations) ? input.patch.operations : [];
-  const diagnostics = operations.flatMap((operation, index) => isObject(operation) && typeof operation.op === "string" ? [] : [{ code: "JMX_RAW_PATCH_INVALID_OPERATION", severity: "error", message: `Operation ${index} must be an object with an op string.` }]);
+  const diagnostics = operations.flatMap((operation, index) => validateRawOperation(operation, index));
   return { success: true, data: { valid: diagnostics.length === 0, operationCount: operations.length, diagnostics } };
+}
+
+function validateRawOperation(operation: unknown, index: number): Array<{ code: string; severity: "error"; message: string; field?: string }> {
+  if (!isObject(operation) || typeof operation.op !== "string") {
+    return [{ code: "JMX_RAW_PATCH_INVALID_OPERATION", severity: "error", message: `Operation ${index} must be an object with an op string.` }];
+  }
+
+  switch (operation.op) {
+    case "addNode": return requiredRawFields(operation, index, ["parentNodeId", "nodeType"]);
+    case "updateField": return requiredRawFields(operation, index, ["nodeId", "fieldPath"]);
+    case "deleteNode": return requiredRawFields(operation, index, ["nodeId"]);
+    case "moveNode":
+    case "cloneNode": return requiredRawFields(operation, index, ["nodeId", "toParentNodeId"]);
+    case "setEnabled": return requiredRawFields(operation, index, ["nodeId"]).concat(typeof operation.enabled === "boolean" ? [] : rawFieldDiagnostic(index, "enabled", "enabled must be a boolean."));
+    default: return [{ code: "JMX_RAW_PATCH_UNSUPPORTED_OPERATION", severity: "error", message: `Operation ${index} uses unsupported op ${operation.op}.`, field: `operations[${index}].op` }];
+  }
+}
+
+function requiredRawFields(operation: Record<string, unknown>, index: number, fields: string[]): Array<{ code: string; severity: "error"; message: string; field: string }> {
+  return fields.flatMap((field) => typeof operation[field] === "string" && operation[field].length > 0 ? [] : [rawFieldDiagnostic(index, field, `${field} must be a non-empty string.`)]);
+}
+
+function rawFieldDiagnostic(index: number, field: string, message: string): { code: string; severity: "error"; message: string; field: string } {
+  return { code: "JMX_RAW_PATCH_INVALID_OPERATION", severity: "error", message: `Operation ${index}: ${message}`, field: `operations[${index}].${field}` };
 }
 
 function generateRawTemplate(input: ToolCallInput): ToolCallResult {
