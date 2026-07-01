@@ -56,6 +56,30 @@ describe("stdio JSON-RPC MCP transport", () => {
     }), server, runtime)).resolves.toBeUndefined();
   });
 
+  it("accepts JSON-RPC null request ids", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      method: "ping"
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      result: {}
+    });
+  });
+
+  it("responds to shutdown requests for clean stdio lifecycle shutdown", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "shutdown",
+      method: "shutdown"
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "shutdown",
+      result: {}
+    });
+  });
+
   it("lists tools, resources, resource templates, and prompts in MCP result wrappers", async () => {
     const tools = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }), server, runtime);
     expect((tools?.result as { tools: unknown[] }).tools.length).toBeGreaterThan(0);
@@ -123,6 +147,12 @@ describe("stdio JSON-RPC MCP transport", () => {
       jsonrpc: "2.0",
       id: 1,
       error: { code: -32601, message: "Method not found: missing" }
+    });
+
+    await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: {}, method: "ping" }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "id must be a string, number, or null when present" }
     });
 
     await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: {} }), server, runtime)).resolves.toEqual({

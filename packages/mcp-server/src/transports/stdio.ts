@@ -12,7 +12,7 @@ const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
 
-type JsonRpcId = string | number;
+type JsonRpcId = string | number | null;
 type JsonRpcRequest = {
   jsonrpc: "2.0";
   id?: JsonRpcId;
@@ -22,7 +22,7 @@ type JsonRpcRequest = {
 
 export type JsonRpcResponse = {
   jsonrpc: "2.0";
-  id: JsonRpcId | null;
+  id: JsonRpcId;
   result?: Record<string, unknown>;
   error?: {
     code: number;
@@ -40,9 +40,15 @@ export function runStdioServer(): void {
   const lines = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
 
   lines.on("line", (line) => {
-    void handleLine(line, server, runtime, (response) => {
-      process.stdout.write(`${JSON.stringify(response)}\n`);
-    });
+    void (async () => {
+      await handleLine(line, server, runtime, (response) => {
+        process.stdout.write(`${JSON.stringify(response)}\n`);
+      });
+      if (isShutdownMessage(line)) {
+        lines.close();
+        process.stdin.pause();
+      }
+    })();
   });
 }
 
@@ -96,6 +102,8 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
   switch (request.method) {
     case "initialize":
       return initializeResult(request.params);
+    case "shutdown":
+      return {};
     case "ping":
       return {};
     case "tools/list":
@@ -118,7 +126,7 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
 }
 
 function handleNotification(request: JsonRpcRequest): void {
-  if (request.method === "notifications/initialized" || request.method.startsWith("notifications/")) {
+  if (request.method === "exit" || request.method === "notifications/initialized" || request.method.startsWith("notifications/")) {
     return;
   }
 }
@@ -190,8 +198,8 @@ function validateRequest(value: unknown): { code: number; message: string } | un
   if (typeof value.method !== "string" || value.method.length === 0) {
     return { code: INVALID_REQUEST, message: "method must be a non-empty string" };
   }
-  if ("id" in value && typeof value.id !== "string" && typeof value.id !== "number") {
-    return { code: INVALID_REQUEST, message: "id must be a string or number when present" };
+  if ("id" in value && value.id !== null && typeof value.id !== "string" && typeof value.id !== "number") {
+    return { code: INVALID_REQUEST, message: "id must be a string, number, or null when present" };
   }
   if (value.params !== undefined && !isObject(value.params)) {
     return { code: INVALID_PARAMS, message: "params must be an object when present" };
@@ -203,15 +211,24 @@ function successResponse(id: JsonRpcId, result: Record<string, unknown>): JsonRp
   return { jsonrpc: JSONRPC_VERSION, id, result };
 }
 
-function errorResponse(id: JsonRpcId | null, code: number, message: string, data?: unknown): JsonRpcResponse {
+function errorResponse(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
   return { jsonrpc: JSONRPC_VERSION, id, error: data === undefined ? { code, message } : { code, message, data } };
 }
 
-function requestId(value: unknown): JsonRpcId | null {
-  if (isObject(value) && (typeof value.id === "string" || typeof value.id === "number")) {
+function requestId(value: unknown): JsonRpcId {
+  if (isObject(value) && (value.id === null || typeof value.id === "string" || typeof value.id === "number")) {
     return value.id;
   }
   return null;
+}
+
+function isShutdownMessage(line: string): boolean {
+  try {
+    const request = JSON.parse(line) as unknown;
+    return isObject(request) && (request.method === "shutdown" || request.method === "exit");
+  } catch {
+    return false;
+  }
 }
 
 function requiredString(params: Record<string, unknown> | undefined, key: string): string {
