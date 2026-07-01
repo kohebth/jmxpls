@@ -636,6 +636,24 @@ describe("JmxplsRuntime", () => {
     expect((analysis.data as { metrics: { errors: number } }).metrics.errors).toBe(1);
   });
 
+  it("executes JMeter runs when explicitly requested", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-exec-real-"));
+    const planPath = join(dir, "plan.jmx");
+    const jtlPath = join(dir, "results.jtl");
+    const executable = join(dir, "jmeter");
+    writeFileSync(planPath, "<jmeterTestPlan />");
+    writeFileSync(executable, "#!/bin/sh\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-l\" ]; then\n    shift\n    printf 'elapsed,label,responseCode,success\\n42,GET /,200,true\\n' > \"$1\"\n  fi\n  shift\ndone\necho executed-jmeter\n");
+    chmodSync(executable, 0o755);
+
+    const runtime = new JmxplsRuntime();
+    const result = await runtime.callTool("run_jmeter", { planPath, jtlPath, jmeterExecutable: executable, execute: true });
+    expect(result.success).toBe(true);
+    expect((result.data as { executionMode: string; run: { status: string; logs: string[] } }).executionMode).toBe("executed");
+    expect((result.data as { run: { status: string } }).run.status).toBe("completed");
+    expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: executed-jmeter");
+    expect(readFileSync(jtlPath, "utf8")).toContain("GET /");
+  });
+
   it("serves and merges component catalogs", async () => {
     const runtime = new JmxplsRuntime();
     const loaded = await runtime.callTool("load_component_catalog");
