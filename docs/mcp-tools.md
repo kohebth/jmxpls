@@ -30,7 +30,7 @@ Plan Language import and apply responses include a final `validation` result for
 
 ## Semantic Mutations
 
-Use `add_node`, `update_node_field`, `delete_node`, `move_node`, `clone_node`, `enable_node`, `disable_node`, or `apply_semantic_patch` for generic tree edits. Semantic mutations validate before commit by default; pass `validate: false` only for deliberate unsafe/raw workflows. Mutation inputs accept `dryRun` and `validate` where applicable. Save changes with `save_plan` or `save_plan_as`.
+Use `add_node`, `update_node_field`, `delete_node`, `move_node`, `clone_node`, `enable_node`, `disable_node`, or `apply_semantic_patch` for generic tree edits. Semantic mutations validate before commit by default; pass `validate: false` only for deliberate unsafe semantic workflows. Mutation inputs accept `dryRun` and `validate` where applicable. Save changes with `save_plan` or `save_plan_as`.
 
 ## Typed Component Tools
 
@@ -79,9 +79,9 @@ Raw tools are reserved for unknown/plugin nodes and low-level recovery work. Pre
 
 - `get_raw_element` returns the semantic node plus its `rawRef` and field map.
 - `get_raw_properties` returns only the raw field map for a node.
-- `add_raw_element` forwards to `add_node` with caller-provided `nodeType` and `fields`.
-- `update_raw_property` forwards to `update_node_field`; use `dryRun: true` first for risky edits.
-- `replace_raw_element` applies a field-by-field semantic patch from a provided `fields` object.
+- `add_raw_element` forwards to `add_node` with caller-provided `nodeType` and `fields`, with validation enabled.
+- `update_raw_property` forwards to `update_node_field` with validation enabled; use `dryRun: true` first for risky edits.
+- `replace_raw_element` applies a field-by-field semantic patch from a provided `fields` object with validation enabled.
 - `validate_raw_patch` checks raw patch shape before applying it.
 - `generate_raw_template` creates a starter field object for plugin/custom elements.
 

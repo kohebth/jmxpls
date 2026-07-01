@@ -651,7 +651,7 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(planPath, "utf8")).toContain("<TestPlan ");
   });
 
-  it("validates semantic edits by default while raw edits opt out", async () => {
+  it("validates semantic and raw edits by default", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-safe-edits-"));
     const planPath = join(dir, "minimal.jmx");
     copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
@@ -679,7 +679,7 @@ describe("JmxplsRuntime", () => {
       value: "Raw Unsafe Name"
     });
     expect(raw.success).toBe(true);
-    expect((raw.data as { validation?: unknown }).validation).toBeUndefined();
+    expect((raw.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
   });
 
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
