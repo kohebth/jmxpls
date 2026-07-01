@@ -15,7 +15,8 @@ const SERVER_SHUTTING_DOWN = -32000;
 const SERVER_NOT_INITIALIZED = -32002;
 const LIST_PAGE_SIZE = 50;
 
-type JsonRpcId = string | number | null;
+type JsonRpcId = string | number;
+type JsonRpcResponseId = JsonRpcId | null;
 type JsonRpcRequest = {
   jsonrpc: "2.0";
   id?: JsonRpcId;
@@ -25,7 +26,7 @@ type JsonRpcRequest = {
 
 export type JsonRpcResponse = {
   jsonrpc: "2.0";
-  id: JsonRpcId;
+  id: JsonRpcResponseId;
   result?: Record<string, unknown>;
   error?: {
     code: number;
@@ -360,8 +361,8 @@ function validateRequest(value: unknown): { code: number; message: string } | un
   if (typeof value.method !== "string" || value.method.length === 0) {
     return { code: INVALID_REQUEST, message: "method must be a non-empty string" };
   }
-  if ("id" in value && value.id !== null && typeof value.id !== "string" && typeof value.id !== "number") {
-    return { code: INVALID_REQUEST, message: "id must be a string, number, or null when present" };
+  if ("id" in value && typeof value.id !== "string" && typeof value.id !== "number") {
+    return { code: INVALID_REQUEST, message: "id must be a string or number when present" };
   }
   if (value.params !== undefined && !isObject(value.params)) {
     return { code: INVALID_PARAMS, message: "params must be an object when present" };
@@ -387,12 +388,12 @@ function successResponse(id: JsonRpcId, result: Record<string, unknown>): JsonRp
   return { jsonrpc: JSONRPC_VERSION, id, result };
 }
 
-function errorResponse(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
+function errorResponse(id: JsonRpcResponseId, code: number, message: string, data?: unknown): JsonRpcResponse {
   return { jsonrpc: JSONRPC_VERSION, id, error: data === undefined ? { code, message } : { code, message, data } };
 }
 
-function requestId(value: unknown): JsonRpcId {
-  if (isObject(value) && (value.id === null || typeof value.id === "string" || typeof value.id === "number")) {
+function requestId(value: unknown): JsonRpcResponseId {
+  if (isObject(value) && (typeof value.id === "string" || typeof value.id === "number")) {
     return value.id;
   }
   return null;

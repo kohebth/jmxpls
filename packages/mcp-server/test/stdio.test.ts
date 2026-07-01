@@ -93,7 +93,7 @@ describe("stdio JSON-RPC MCP transport", () => {
     }), server, runtime)).resolves.toBeUndefined();
   });
 
-  it("accepts JSON-RPC null request ids", async () => {
+  it("rejects MCP null request ids", async () => {
     await expect(handleJsonRpcMessage(JSON.stringify({
       jsonrpc: "2.0",
       id: null,
@@ -101,7 +101,7 @@ describe("stdio JSON-RPC MCP transport", () => {
     }), server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",
       id: null,
-      result: {}
+      error: { code: -32600, message: "id must be a string or number when present" }
     });
   });
 
@@ -328,7 +328,7 @@ describe("stdio JSON-RPC MCP transport", () => {
     await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: {}, method: "ping" }), server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",
       id: null,
-      error: { code: -32600, message: "id must be a string, number, or null when present" }
+      error: { code: -32600, message: "id must be a string or number when present" }
     });
 
     await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: {} }), server, runtime)).resolves.toEqual({
