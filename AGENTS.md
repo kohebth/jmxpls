@@ -23,7 +23,7 @@ Use TypeScript modules with ESM imports and explicit exported types for public c
 
 ## Testing Guidelines
 
-TypeScript tests use Vitest and live under each package `test/` directory. Add fixtures under `fixtures/jmx/`, `fixtures/malformed/`, `fixtures/plugins/`, or `fixtures/large/` when behavior depends on JMX shape. Cover round-trip fidelity, semantic diffs, validation, patch application, and MCP runtime behavior. Per project cadence, run tests after every five implementation phases unless the user asks otherwise.
+TypeScript tests use Vitest and live under each package `test/` directory. Add fixtures under `fixtures/jmx/`, `fixtures/malformed/`, `fixtures/plugins/`, or `fixtures/large/` when behavior depends on JMX shape. Cover round-trip fidelity, semantic diffs, validation, patch application, and MCP runtime behavior. Per project cadence, run tests after every five implementation phases unless the user asks otherwise. During active AC-AJ phased implementation, implement module slices first, record pending tests, add focused tests after implementation modules are complete, then finish docs.
 
 ## Commit & Pull Request Guidelines
 
@@ -32,3 +32,5 @@ No established Git history is available here. Use concise imperative commit mess
 ## Agent-Specific Instructions
 
 Use `apply_patch` for manual repository edits. Before editing an existing protected guide such as this file, ask the user for permission.
+
+When the user says `continue`, `next`, `go`, or gives broad approval, reread this file, inspect current trackers, pick the next unchecked actionable task, and carry it through implementation, tracker updates, build-only verification, and commit. Prefer one coherent module at a time, but continue into the next module in the same turn when the path is clear and no approval or product decision is needed.
