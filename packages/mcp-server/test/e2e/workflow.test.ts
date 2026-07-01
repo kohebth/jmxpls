@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createJmxplsServer } from "../../src/index.js";
 import { JmxplsRuntime } from "../../src/runtime/execution-runtime.js";
-import { handleJsonRpcMessage, type JsonRpcResponse } from "../../src/transports/stdio.js";
+import { JsonRpcMcpSession, type JsonRpcResponse } from "../../src/transports/stdio.js";
 
 const root = resolve(import.meta.dirname, "../../../..");
 
@@ -24,11 +24,11 @@ describe("MCP workflow surface", () => {
     const planPath = join(dir, "minimal.jmx");
     copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
 
-    const server = createJmxplsServer();
-    const runtime = new JmxplsRuntime();
-    const rpc = (method: string, params?: Record<string, unknown>) => callRpc(server, runtime, method, params);
+    const session = new JsonRpcMcpSession(createJmxplsServer(), new JmxplsRuntime());
+    const rpc = (method: string, params?: Record<string, unknown>) => callRpc(session, method, params);
 
     expect((await rpc("initialize", { protocolVersion: "2025-06-18" })).result?.serverInfo).toEqual(expect.objectContaining({ name: "jmxpls" }));
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
 
     const opened = toolData<OpenPlanResponse>(await rpc("tools/call", { name: "open_plan", arguments: { path: planPath } }));
     expect(opened.defaultResource).toMatch(/^jmxpls:\/\/plans\/.+\/plan-language\/outline$/);
@@ -54,18 +54,18 @@ describe("MCP workflow surface", () => {
   });
 });
 
-type RpcServer = ReturnType<typeof createJmxplsServer>;
-type RpcRuntime = Pick<JmxplsRuntime, "callTool" | "readResource">;
 type OpenPlanResponse = { planId: string; defaultResource: string };
 type PlanLanguageResponse = { format: string };
 type TreePageResponse = { items: Array<{ nodeId: string }> };
 type SemanticDiffResponse = { changes: Array<Record<string, unknown>> };
 type ValidationResponse = { valid: boolean };
 
-async function callRpc(server: RpcServer, runtime: RpcRuntime, method: string, params?: Record<string, unknown>): Promise<JsonRpcResponse> {
-  const response = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: method, method, ...(params ? { params } : {}) }), server, runtime);
-  expect(response?.error).toBeUndefined();
-  return response!;
+async function callRpc(session: JsonRpcMcpSession, method: string, params?: Record<string, unknown>): Promise<JsonRpcResponse> {
+  const response = await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: method, method, ...(params ? { params } : {}) }));
+  expect(Array.isArray(response)).toBe(false);
+  const single = response as JsonRpcResponse | undefined;
+  expect(single?.error).toBeUndefined();
+  return single!;
 }
 
 function structuredData<T = { success: boolean; data?: unknown }>(response: JsonRpcResponse): T {

@@ -11,6 +11,8 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
+const SERVER_SHUTTING_DOWN = -32000;
+const SERVER_NOT_INITIALIZED = -32002;
 
 type JsonRpcId = string | number | null;
 type JsonRpcRequest = {
@@ -34,18 +36,20 @@ export type JsonRpcMessageResponse = JsonRpcResponse | JsonRpcResponse[];
 
 type RuntimeLike = Pick<JmxplsRuntime, "callTool" | "readResource">;
 type ServerLike = ReturnType<typeof createJmxplsServer>;
+type SessionState = "new" | "initializing" | "ready" | "shutdown";
 
 export function runStdioServer(): void {
   const server = createJmxplsServer();
   const runtime = new JmxplsRuntime();
+  const session = new JsonRpcMcpSession(server, runtime);
   const lines = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
 
   lines.on("line", (line) => {
     void (async () => {
-      await handleLine(line, server, runtime, (response) => {
+      await handleLine(line, session, (response) => {
         process.stdout.write(`${JSON.stringify(response)}\n`);
       });
-      if (isShutdownMessage(line)) {
+      if (session.shouldClose) {
         lines.close();
         process.stdin.pause();
       }
@@ -54,6 +58,56 @@ export function runStdioServer(): void {
 }
 
 export async function handleJsonRpcMessage(line: string, server: ServerLike = createJmxplsServer(), runtime: RuntimeLike = new JmxplsRuntime()): Promise<JsonRpcMessageResponse | undefined> {
+  return handleJsonRpcMessageWithState(line, server, runtime);
+}
+
+export class JsonRpcMcpSession {
+  private state: SessionState;
+  shouldClose = false;
+
+  constructor(private readonly server: ServerLike = createJmxplsServer(), private readonly runtime: RuntimeLike = new JmxplsRuntime(), initialState: SessionState = "new") {
+    this.state = initialState;
+  }
+
+  async handleMessage(line: string): Promise<JsonRpcMessageResponse | undefined> {
+    return handleJsonRpcMessageWithState(line, this.server, this.runtime, this);
+  }
+
+  lifecycleError(request: JsonRpcRequest): { code: number; message: string } | undefined {
+    if (request.method === "initialize") {
+      return this.state === "new" ? undefined : { code: INVALID_REQUEST, message: "Server is already initialized" };
+    }
+    if (request.method === "shutdown") {
+      return this.state === "shutdown" ? { code: SERVER_SHUTTING_DOWN, message: "Server is shutting down" } : undefined;
+    }
+    if (this.state === "shutdown") {
+      return { code: SERVER_SHUTTING_DOWN, message: "Server is shutting down" };
+    }
+    if (this.state !== "ready") {
+      return { code: SERVER_NOT_INITIALIZED, message: "Server is not initialized" };
+    }
+    return undefined;
+  }
+
+  markRequestHandled(request: JsonRpcRequest): void {
+    if (request.method === "initialize") {
+      this.state = "initializing";
+    } else if (request.method === "shutdown") {
+      this.state = "shutdown";
+    }
+  }
+
+  handleNotification(request: JsonRpcRequest): void {
+    if (request.method === "notifications/initialized" && this.state === "initializing") {
+      this.state = "ready";
+    }
+    if (request.method === "exit") {
+      this.shouldClose = true;
+    }
+  }
+}
+
+async function handleJsonRpcMessageWithState(line: string, server: ServerLike, runtime: RuntimeLike, session?: JsonRpcMcpSession): Promise<JsonRpcMessageResponse | undefined> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
@@ -65,11 +119,15 @@ export async function handleJsonRpcMessage(line: string, server: ServerLike = cr
     if (parsed.length === 0) {
       return errorResponse(null, INVALID_REQUEST, "Invalid Request");
     }
-    const responses = (await Promise.all(parsed.map((item) => handleJsonRpcValue(item, server, runtime)))).filter((response): response is JsonRpcResponse => response !== undefined);
+    const responses: JsonRpcResponse[] = [];
+    for (const item of parsed) {
+      const response = await handleJsonRpcValue(item, server, runtime, session);
+      if (response) responses.push(response);
+    }
     return responses.length > 0 ? responses : undefined;
   }
 
-  return handleJsonRpcValue(parsed, server, runtime);
+  return handleJsonRpcValue(parsed, server, runtime, session);
 }
 
 export function resolvePromptTemplate(template: string, args: Record<string, unknown>): string {
@@ -82,7 +140,7 @@ export function resolvePromptTemplate(template: string, args: Record<string, unk
   });
 }
 
-async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: RuntimeLike): Promise<JsonRpcResponse | undefined> {
+async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: RuntimeLike, session?: JsonRpcMcpSession): Promise<JsonRpcResponse | undefined> {
   const requestError = validateRequest(parsed);
   if (requestError) {
     return errorResponse(requestId(parsed), requestError.code, requestError.message);
@@ -90,12 +148,20 @@ async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: 
 
   const request = parsed as JsonRpcRequest;
   if (request.id === undefined) {
+    session?.handleNotification(request);
     handleNotification(request);
     return undefined;
   }
 
+  const lifecycleError = session?.lifecycleError(request);
+  if (lifecycleError) {
+    return errorResponse(request.id, lifecycleError.code, lifecycleError.message);
+  }
+
   try {
-    return successResponse(request.id, await dispatchRequest(request, server, runtime));
+    const response = successResponse(request.id, await dispatchRequest(request, server, runtime));
+    session?.markRequestHandled(request);
+    return response;
   } catch (error) {
     if (error instanceof RpcError) {
       return errorResponse(request.id, error.code, error.message, error.data);
@@ -104,8 +170,8 @@ async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: 
   }
 }
 
-async function handleLine(line: string, server: ServerLike, runtime: RuntimeLike, write: (response: JsonRpcMessageResponse) => void): Promise<void> {
-  const response = await handleJsonRpcMessage(line, server, runtime);
+async function handleLine(line: string, session: JsonRpcMcpSession, write: (response: JsonRpcMessageResponse) => void): Promise<void> {
+  const response = await session.handleMessage(line);
   if (response) {
     write(response);
   }
@@ -233,19 +299,6 @@ function requestId(value: unknown): JsonRpcId {
     return value.id;
   }
   return null;
-}
-
-function isShutdownMessage(line: string): boolean {
-  try {
-    const request = JSON.parse(line) as unknown;
-    return Array.isArray(request) ? request.some(isShutdownRequest) : isShutdownRequest(request);
-  } catch {
-    return false;
-  }
-}
-
-function isShutdownRequest(request: unknown): boolean {
-  return isObject(request) && (request.method === "shutdown" || request.method === "exit");
 }
 
 function requiredString(params: Record<string, unknown> | undefined, key: string): string {

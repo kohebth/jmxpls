@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createJmxplsServer } from "../src/server.js";
-import { handleJsonRpcMessage, resolvePromptTemplate } from "../src/transports/stdio.js";
+import { handleJsonRpcMessage, JsonRpcMcpSession, resolvePromptTemplate } from "../src/transports/stdio.js";
 
 const server = createJmxplsServer();
 const runtime = {
@@ -188,5 +188,54 @@ describe("stdio JSON-RPC MCP transport", () => {
       id: 2,
       error: { code: -32602, message: "name is required" }
     });
+  });
+});
+
+describe("stateful stdio MCP lifecycle", () => {
+  it("rejects tools before initialize and initialized notification", async () => {
+    const session = new JsonRpcMcpSession(server, runtime);
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "tools",
+      error: { code: -32002, message: "Server is not initialized" }
+    });
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize" }))).resolves.toEqual(expect.objectContaining({
+      jsonrpc: "2.0",
+      id: "init",
+      result: expect.objectContaining({ serverInfo: expect.objectContaining({ name: "jmxpls" }) })
+    }));
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "blocked", method: "tools/list" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "blocked",
+      error: { code: -32002, message: "Server is not initialized" }
+    });
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))).resolves.toBeUndefined();
+    expect((await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ready", method: "tools/list" })))?.result).toEqual({ tools: expect.any(Array) });
+  });
+
+  it("enters shutdown state and closes only after exit notification", async () => {
+    const session = new JsonRpcMcpSession(server, runtime);
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize" }));
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "shutdown", method: "shutdown" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "shutdown",
+      result: {}
+    });
+    expect(session.shouldClose).toBe(false);
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "blocked", method: "tools/list" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "blocked",
+      error: { code: -32000, message: "Server is shutting down" }
+    });
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "exit" }))).resolves.toBeUndefined();
+    expect(session.shouldClose).toBe(true);
   });
 });
