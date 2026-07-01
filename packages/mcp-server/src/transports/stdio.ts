@@ -12,7 +12,6 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
-const SERVER_SHUTTING_DOWN = -32000;
 const SERVER_NOT_INITIALIZED = -32002;
 const LIST_PAGE_SIZE = 50;
 
@@ -39,7 +38,7 @@ export type JsonRpcMessageResponse = JsonRpcResponse | JsonRpcResponse[];
 
 type RuntimeLike = Pick<JmxplsRuntime, "callTool" | "readResource">;
 type ServerLike = ReturnType<typeof createJmxplsServer>;
-type SessionState = "new" | "initializing" | "ready" | "shutdown";
+type SessionState = "new" | "initializing" | "ready";
 
 export function runStdioServer(): void {
   const server = createJmxplsServer();
@@ -84,14 +83,8 @@ export class JsonRpcMcpSession {
     if (request.method === "initialize") {
       return this.state === "new" ? undefined : { code: INVALID_REQUEST, message: "Server is already initialized" };
     }
-    if (this.state === "shutdown") {
-      return { code: SERVER_SHUTTING_DOWN, message: "Server is shutting down" };
-    }
     if (this.state !== "ready") {
       return { code: SERVER_NOT_INITIALIZED, message: "Server is not initialized" };
-    }
-    if (request.method === "shutdown") {
-      return undefined;
     }
     return undefined;
   }
@@ -99,17 +92,12 @@ export class JsonRpcMcpSession {
   markRequestHandled(request: JsonRpcRequest): void {
     if (request.method === "initialize") {
       this.state = "initializing";
-    } else if (request.method === "shutdown") {
-      this.state = "shutdown";
     }
   }
 
   handleNotification(request: JsonRpcRequest): void {
     if (request.method === "notifications/initialized" && this.state === "initializing") {
       this.state = "ready";
-    }
-    if (request.method === "exit") {
-      this.shouldClose = true;
     }
   }
 }
@@ -192,8 +180,6 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
   switch (request.method) {
     case "initialize":
       return initializeResult(request.params);
-    case "shutdown":
-      return {};
     case "ping":
       return {};
     case "tools/list":

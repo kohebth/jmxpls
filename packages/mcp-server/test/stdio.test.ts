@@ -105,7 +105,7 @@ describe("stdio JSON-RPC MCP transport", () => {
     });
   });
 
-  it("responds to shutdown requests for clean stdio lifecycle shutdown", async () => {
+  it("returns method not found for non-standard shutdown requests", async () => {
     await expect(handleJsonRpcMessage(JSON.stringify({
       jsonrpc: "2.0",
       id: "shutdown",
@@ -113,7 +113,25 @@ describe("stdio JSON-RPC MCP transport", () => {
     }), server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",
       id: "shutdown",
-      result: {}
+      error: { code: -32601, message: "Method not found: shutdown" }
+    });
+  });
+
+  it("does not implement non-standard shutdown requests", async () => {
+    const session = new JsonRpcMcpSession(server, runtime);
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize", params: initializeParams }));
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "shutdown", method: "shutdown" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "shutdown",
+      error: { code: -32601, message: "Method not found: shutdown" }
+    });
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "tools",
+      result: expect.objectContaining({ tools: expect.any(Array) })
     });
   });
 
@@ -416,7 +434,7 @@ describe("stateful stdio MCP lifecycle", () => {
     expect((await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ready", method: "tools/list" })))?.result).toEqual(expect.objectContaining({ tools: expect.any(Array) }));
   });
 
-  it("enters shutdown state and closes only after exit notification", async () => {
+  it("ignores non-standard exit notifications and keeps the session ready", async () => {
     const session = new JsonRpcMcpSession(server, runtime);
     await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize", params: initializeParams }));
     await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
@@ -424,17 +442,17 @@ describe("stateful stdio MCP lifecycle", () => {
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "shutdown", method: "shutdown" }))).resolves.toEqual({
       jsonrpc: "2.0",
       id: "shutdown",
-      result: {}
+      error: { code: -32601, message: "Method not found: shutdown" }
     });
     expect(session.shouldClose).toBe(false);
 
-    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "blocked", method: "tools/list" }))).resolves.toEqual({
-      jsonrpc: "2.0",
-      id: "blocked",
-      error: { code: -32000, message: "Server is shutting down" }
-    });
-
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "exit" }))).resolves.toBeUndefined();
-    expect(session.shouldClose).toBe(true);
+    expect(session.shouldClose).toBe(false);
+
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }))).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "tools",
+      result: expect.objectContaining({ tools: expect.any(Array) })
+    });
   });
 });
