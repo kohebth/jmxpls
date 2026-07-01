@@ -4,6 +4,7 @@ import { registerCatalogResources } from "./resources/catalog-resources.js";
 import { registerDiffResources } from "./resources/diff-resources.js";
 import { registerPlanResources } from "./resources/plan-resources.js";
 import { registerRunResources } from "./resources/run-resources.js";
+import { registerSecurityResources } from "./resources/security-resources.js";
 import { registerCatalogTools } from "./tools/catalog-tools.js";
 import { registerExecutionTools } from "./tools/execution-tools.js";
 import { registerMutationTools } from "./tools/mutation-tools.js";
@@ -38,6 +39,7 @@ export function createJmxplsServer(): JmxplsServer {
   registerCatalogResources(resourceRegistry);
   registerRunResources(resourceRegistry);
   registerDiffResources(resourceRegistry);
+  registerSecurityResources(resourceRegistry);
   registerSessionTools(toolRegistry);
   registerQueryTools(toolRegistry);
   registerPlanLanguageTools(toolRegistry);

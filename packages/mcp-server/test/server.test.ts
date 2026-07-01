@@ -16,7 +16,8 @@ describe("createJmxplsServer", () => {
       "jmxpls://catalog/types/{type}",
       "jmxpls://runs",
       "jmxpls://runs/{runId}/logs",
-      "jmxpls://runs/{runId}/artifacts"
+      "jmxpls://runs/{runId}/artifacts",
+      "jmxpls://audit"
     ]) {
       expect(resources.has(resource)).toBe(true);
     }

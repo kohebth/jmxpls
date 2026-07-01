@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
 import {
   BridgeClient,
@@ -20,27 +21,43 @@ import {
 
 import { CatalogToolRuntime } from "./catalog-runtime.js";
 import { TemplateToolRuntime } from "./template-runtime.js";
+import { AuditLog } from "../security/audit-log.js";
+import { WorkspaceGuard } from "../security/workspace-guard.js";
 import { JmxplsRuntime as BaseRuntime, type ToolCallInput, type ToolCallResult } from "./tool-runtime.js";
 
 type RawNodeView = { nodeId: string; rawRef: string; fields: Record<string, unknown> };
 type OpenPlanSummary = { planId: string; sourcePath: string };
+type RuntimeOptions = {
+  workspaceRoots?: string[];
+};
 
 export class JmxplsRuntime extends BaseRuntime {
   private readonly runs = new RunManager();
   private readonly catalogTools = new CatalogToolRuntime();
   private readonly templateTools = new TemplateToolRuntime();
+  private readonly auditLog = new AuditLog();
+  private readonly workspaceGuard: WorkspaceGuard;
+
+  constructor(options: RuntimeOptions = {}) {
+    super();
+    this.workspaceGuard = new WorkspaceGuard(options.workspaceRoots ?? workspaceRootsFromEnv());
+  }
 
   override async callTool(name: string, input: ToolCallInput = {}): Promise<ToolCallResult> {
+    const pathError = this.validateToolPaths(name, input);
+    if (pathError) return pathError;
+
     const executionResult = await this.callExecutionTool(name, input);
-    if (executionResult) return executionResult;
+    if (executionResult) return this.auditResult(name, input, executionResult);
     const rawResult = await this.callRawTool(name, input);
-    if (rawResult) return rawResult;
+    if (rawResult) return this.auditResult(name, input, rawResult);
     const bridgeValidationResult = await this.callBridgeValidationTool(name, input);
     if (bridgeValidationResult) return bridgeValidationResult;
     const catalogResult = await this.catalogTools.callTool(name, input);
     if (catalogResult) return catalogResult;
     const templateResult = await this.templateTools.callTool(name, input, this);
-    return templateResult ?? super.callTool(name, input);
+    if (templateResult) return this.auditResult(name, input, templateResult);
+    return this.auditResult(name, input, await super.callTool(name, input));
   }
 
   override readResource(uri: string): ToolCallResult {
@@ -50,6 +67,9 @@ export class JmxplsRuntime extends BaseRuntime {
     }
     if (uri === "jmxpls://runs") {
       return { success: true, data: this.runs.list() };
+    }
+    if (uri === "jmxpls://audit") {
+      return { success: true, data: this.auditLog.list() };
     }
     const match = /^jmxpls:\/\/runs\/([^/]+)(?:\/(logs|artifacts))?$/.exec(uri);
     if (!match) {
@@ -233,6 +253,70 @@ export class JmxplsRuntime extends BaseRuntime {
     const run = this.runs.create({ command, artifacts: [outputDir], logs: [`Prepared JMeter report command: ${command.executable} ${command.args.join(" ")}`] });
     return { success: true, data: { run, command, executionMode: "planned" } };
   }
+
+  private validateToolPaths(name: string, input: ToolCallInput): ToolCallResult | undefined {
+    for (const key of pathKeysForTool(name)) {
+      const value = input[key];
+      if (typeof value === "string" && value.length > 0 && !this.workspaceGuard.allows(value)) {
+        return { success: false, error: `Path for ${key} is outside configured workspace roots: ${value}` };
+      }
+    }
+    return undefined;
+  }
+
+  private auditResult(name: string, input: ToolCallInput, result: ToolCallResult): ToolCallResult {
+    if (result.success && AUDITED_TOOLS.has(name)) {
+      this.auditLog.record(name, auditTarget(input, result));
+    }
+    return result;
+  }
+}
+
+const AUDITED_TOOLS = new Set([
+  "add_node",
+  "update_node_field",
+  "delete_node",
+  "move_node",
+  "clone_node",
+  "enable_node",
+  "disable_node",
+  "apply_semantic_patch",
+  "add_raw_element",
+  "update_raw_property",
+  "replace_raw_element",
+  "save_plan",
+  "save_plan_as",
+  "run_jmeter",
+  "generate_html_report"
+]);
+
+const TOOL_PATH_KEYS: Record<string, string[]> = {
+  open_plan: ["path"],
+  save_plan: ["path"],
+  save_plan_as: ["path"],
+  import_plan_language: ["path", "targetPath"],
+  apply_plan_language: ["path"],
+  import_component_catalog: ["path"],
+  validate_with_jmeter: ["path", "planPath", "jmxPath"],
+  roundtrip_validate: ["path", "planPath", "jmxPath"],
+  run_jmeter: ["planPath", "path", "jtlPath", "resultPath"],
+  generate_html_report: ["jtlPath", "path", "outputDir", "reportDir"],
+  analyze_jtl: ["path", "jtlPath"],
+  compare_jtl: ["leftPath", "baselinePath", "left", "rightPath", "candidatePath", "right"],
+  check_sla: ["path", "jtlPath"]
+};
+
+function pathKeysForTool(name: string): string[] {
+  return TOOL_PATH_KEYS[name] ?? [];
+}
+
+function auditTarget(input: ToolCallInput, result: ToolCallResult): string | undefined {
+  for (const key of ["planId", "runId", "path", "planPath", "jtlPath"]) {
+    const value = input[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  if (isObject(result.data) && typeof result.data.planId === "string") return result.data.planId;
+  return undefined;
 }
 
 async function analyzeJtl(input: ToolCallInput): Promise<ToolCallResult> {
@@ -414,4 +498,9 @@ function compactThresholds(values: Record<keyof SlaThresholds, number | undefine
   if (values.maxP95Ms !== undefined) thresholds.maxP95Ms = values.maxP95Ms;
   if (values.minThroughput !== undefined) thresholds.minThroughput = values.minThroughput;
   return thresholds;
+}
+
+function workspaceRootsFromEnv(): string[] {
+  const configured = process.env.JMXPLS_WORKSPACE_ROOTS?.split(":").filter((root) => root.length > 0);
+  return configured && configured.length > 0 ? configured : [process.cwd(), tmpdir()];
 }
