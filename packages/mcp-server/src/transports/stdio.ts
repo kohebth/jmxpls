@@ -216,6 +216,7 @@ function handleNotification(request: JsonRpcRequest): void {
 }
 
 function initializeResult(params: Record<string, unknown> | undefined): Record<string, unknown> {
+  validateInitializeParams(params);
   return {
     protocolVersion: params?.protocolVersion === MCP_PROTOCOL_VERSION ? params.protocolVersion : MCP_PROTOCOL_VERSION,
     capabilities: {
@@ -230,6 +231,15 @@ function initializeResult(params: Record<string, unknown> | undefined): Record<s
     },
     instructions: "Use compact Plan Language resources and semantic tools before requesting raw JMX."
   };
+}
+
+function validateInitializeParams(params: Record<string, unknown> | undefined): void {
+  if (!params || typeof params.protocolVersion !== "string" || !isObject(params.capabilities) || !isObject(params.clientInfo)) {
+    throw new RpcError(INVALID_PARAMS, "initialize params must include protocolVersion, capabilities, and clientInfo");
+  }
+  if (typeof params.clientInfo.name !== "string" || typeof params.clientInfo.version !== "string") {
+    throw new RpcError(INVALID_PARAMS, "clientInfo must include name and version");
+  }
 }
 
 function concreteResources(resources: ServerLike["resources"]): Array<{ uri: string; name: string; description: string }> {

@@ -27,7 +27,7 @@ describe("MCP workflow surface", () => {
     const session = new JsonRpcMcpSession(createJmxplsServer(), new JmxplsRuntime());
     const rpc = (method: string, params?: Record<string, unknown>) => callRpc(session, method, params);
 
-    expect((await rpc("initialize", { protocolVersion: "2025-06-18" })).result?.serverInfo).toEqual(expect.objectContaining({ name: "jmxpls" }));
+    expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "workflow-test", version: "1.0.0" } })).result?.serverInfo).toEqual(expect.objectContaining({ name: "jmxpls" }));
     await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
 
     const opened = toolData<OpenPlanResponse>(await rpc("tools/call", { name: "open_plan", arguments: { path: planPath } }));

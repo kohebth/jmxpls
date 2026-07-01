@@ -8,6 +8,11 @@ const runtime = {
   callTool: async (name: string, input: Record<string, unknown>) => ({ success: true, data: { name, input } }),
   readResource: (uri: string) => ({ success: true, data: { uri, ok: true } })
 };
+const initializeParams = {
+  protocolVersion: "2025-06-18",
+  capabilities: {},
+  clientInfo: { name: "test-client", version: "1.0.0" }
+};
 
 describe("stdio prompt helpers", () => {
   it("renders prompt templates with arguments", () => {
@@ -54,12 +59,31 @@ describe("stdio JSON-RPC MCP transport", () => {
       jsonrpc: "2.0",
       id: "init",
       method: "initialize",
-      params: { protocolVersion: "1900-01-01" }
+      params: { ...initializeParams, protocolVersion: "1900-01-01" }
     }), server, runtime);
 
     expect(response?.result).toEqual(expect.objectContaining({
       protocolVersion: "2025-06-18"
     }));
+  });
+
+  it("rejects initialize requests without required MCP negotiation fields", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "missing", method: "initialize" }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "missing",
+      error: { code: -32602, message: "initialize params must include protocolVersion, capabilities, and clientInfo" }
+    });
+
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "bad-client",
+      method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test-client" } }
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "bad-client",
+      error: { code: -32602, message: "clientInfo must include name and version" }
+    });
   });
 
   it("does not respond to initialized notifications", async () => {
@@ -255,7 +279,7 @@ describe("stateful stdio MCP lifecycle", () => {
       error: { code: -32002, message: "Server is not initialized" }
     });
 
-    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize" }))).resolves.toEqual(expect.objectContaining({
+    await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize", params: initializeParams }))).resolves.toEqual(expect.objectContaining({
       jsonrpc: "2.0",
       id: "init",
       result: expect.objectContaining({ serverInfo: expect.objectContaining({ name: "jmxpls" }) })
@@ -285,7 +309,7 @@ describe("stateful stdio MCP lifecycle", () => {
 
   it("enters shutdown state and closes only after exit notification", async () => {
     const session = new JsonRpcMcpSession(server, runtime);
-    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize" }));
+    await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "init", method: "initialize", params: initializeParams }));
     await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
 
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "shutdown", method: "shutdown" }))).resolves.toEqual({
