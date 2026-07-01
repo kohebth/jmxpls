@@ -157,6 +157,7 @@ describe("JmxplsRuntime", () => {
     });
 
     expect(importResult.success).toBe(true);
+    expect((importResult.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
     const planId = (importResult.data as { planId: string }).planId;
     const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect(threadGroups.success).toBe(true);
@@ -200,6 +201,7 @@ describe("JmxplsRuntime", () => {
     });
 
     expect(importResult.success).toBe(true);
+    expect((importResult.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
     const planId = (importResult.data as { planId: string }).planId;
     const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect(threadGroups.success).toBe(true);
@@ -243,6 +245,7 @@ describe("JmxplsRuntime", () => {
       })
     });
     expect(added.success).toBe(true);
+    expect((added.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
     const beforeReplace = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect((beforeReplace.data as Array<{ name: string }>).map((node) => node.name)).toContain("keep");
 
@@ -273,6 +276,7 @@ describe("JmxplsRuntime", () => {
       })
     });
     expect(replaced.success).toBe(true);
+    expect((replaced.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
     const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect((threadGroups.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
     expect((threadGroups.data as Array<{ name: string; nodeId: string }>)[0]?.name).toBe("replaced");
@@ -328,6 +332,7 @@ describe("JmxplsRuntime", () => {
       })
     });
     expect(merged.success).toBe(true);
+    expect((merged.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
     const afterMerge = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     expect((afterMerge.data as Array<{ name: string; nodeId: string }>).length).toBe(1);
     expect((afterMerge.data as Array<{ name: string; nodeId: string }>).map((node) => node.name)).toContain("seed");

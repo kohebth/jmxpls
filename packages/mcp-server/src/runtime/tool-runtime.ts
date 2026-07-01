@@ -290,6 +290,7 @@ export class JmxplsRuntime {
     }
 
     this.syncPlanLanguageChildren(session, sourceChildren, root.nodeId, mode, input);
+    const validation = session.validate();
 
     return {
       success: true,
@@ -297,6 +298,7 @@ export class JmxplsRuntime {
         planId: session.planId,
         planPath: session.sourcePath,
         planSummary: summarizePlan(session.semanticPlan()),
+        validation,
         ...(isImport ? {} : { operationMode: mode })
       }
     };

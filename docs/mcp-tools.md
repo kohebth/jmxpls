@@ -26,6 +26,8 @@ Resources provide read-only, progressive disclosure views for plans, catalogs, r
 - `apply_plan_language` applies Plan Language from text or path to an opened `planId` using `mode: replace|merge|patch` (default `patch`).
 - `parse_plan_language` parses raw JSON or YAML Plan Language, while `validate_plan_language`, `roundtrip_plan_language`, `explain_plan_language`, and `compare_plan_language` validate and compare compact Plan Language documents.
 
+Plan Language import and apply responses include a final `validation` result for the opened plan. Review it before saving generated or imported `.jmx` files.
+
 ## Semantic Mutations
 
 Use `add_node`, `update_node_field`, `delete_node`, `move_node`, `clone_node`, `enable_node`, `disable_node`, or `apply_semantic_patch` for generic tree edits. Semantic mutations validate before commit by default; pass `validate: false` only for deliberate unsafe/raw workflows. Mutation inputs accept `dryRun` and `validate` where applicable. Save changes with `save_plan` or `save_plan_as`.
