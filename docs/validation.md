@@ -16,7 +16,7 @@ Use `validate_plan` for the full static suite against an opened `planId`. Use fo
 - `JMXPLS_JAVA_COMMAND`: optional Java executable override; defaults to `java`.
 - `JMXPLS_JAVA_BRIDGE_TIMEOUT_MS`: optional request timeout in milliseconds.
 
-If the bridge is not configured, path-based validation returns `JMX_JMETER_BRIDGE_NOT_CONFIGURED`. Session-based validation keeps the static fallback diagnostics so existing `planId` workflows remain usable.
+If the bridge is not configured, path-based validation returns `JMX_JMETER_BRIDGE_NOT_CONFIGURED`. Session-based validation keeps the static fallback diagnostics so existing `planId` workflows remain usable. Fallback responses include `nextSuggestedResources` so agents can continue with diagnostics or audit resources.
 
 ```json
 {"name":"get_jmeter_environment","arguments":{}}

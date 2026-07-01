@@ -551,6 +551,7 @@ describe("JmxplsRuntime", () => {
       expect((result.data as { jmeterBacked: boolean }).jmeterBacked).toBe(false);
       expect((result.data as { valid: boolean }).valid).toBe(false);
       expect((result.data as { diagnostics: Array<{ code: string }> }).diagnostics[0]?.code).toBe("JMX_JMETER_BRIDGE_NOT_CONFIGURED");
+      expect((result.data as { nextSuggestedResources: string[] }).nextSuggestedResources).toContain("jmxpls://audit");
     } finally {
       if (previousJar === undefined) {
         delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
@@ -624,6 +625,31 @@ describe("JmxplsRuntime", () => {
         delete process.env.JMXPLS_JAVA_COMMAND;
       } else {
         process.env.JMXPLS_JAVA_COMMAND = previousCommand;
+      }
+    }
+  });
+
+  it("returns suggested resources for session JMeter validation fallback", async () => {
+    const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
+    delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
+    try {
+      const dir = mkdtempSync(join(tmpdir(), "jmxpls-bridge-fallback-"));
+      const planPath = join(dir, "minimal.jmx");
+      copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+      const runtime = new JmxplsRuntime();
+      const opened = await runtime.callTool("open_plan", { path: planPath });
+      const planId = (opened.data as { planId: string }).planId;
+
+      const result = await runtime.callTool("validate_with_jmeter", { planId });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { jmeterBacked: boolean }).jmeterBacked).toBe(false);
+      expect((result.data as { nextSuggestedResources: string[] }).nextSuggestedResources).toContain(`jmxpls://plans/${planId}/diagnostics`);
+    } finally {
+      if (previousJar === undefined) {
+        delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
+      } else {
+        process.env.JMXPLS_JAVA_BRIDGE_JAR = previousJar;
       }
     }
   });

@@ -401,7 +401,7 @@ function bridgeNotConfigured(path: string, mode: JMeterValidationMode, strict: b
     message: "JMeter bridge validation is not configured in this runtime yet; returned bridge validation fallback.",
     fixSuggestion: "Set JMXPLS_JAVA_BRIDGE_JAR to the Java bridge executable jar before using path-based JMeter validation."
   }];
-  return { success: true, data: { path, mode, jmeterBacked: false, valid: severity !== "error", diagnostics } };
+  return { success: true, data: { path, mode, jmeterBacked: false, valid: severity !== "error", diagnostics, nextSuggestedResources: ["jmxpls://audit"] } };
 }
 
 function bridgeEnvironmentNotConfigured(): ToolCallResult {
@@ -416,7 +416,8 @@ function bridgeEnvironmentNotConfigured(): ToolCallResult {
         severity: "warning",
         message: "JMeter bridge environment is not available because the Java bridge is not configured.",
         fixSuggestion: "Set JMXPLS_JAVA_BRIDGE_JAR to the Java bridge executable jar before probing the JMeter environment."
-      }]
+      }],
+      nextSuggestedResources: ["jmxpls://audit"]
     }
   };
 }

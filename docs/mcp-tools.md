@@ -46,7 +46,7 @@ High-value typed tools generate semantic patches for common JMeter elements:
 - `get_jmeter_environment` probes the configured Java bridge and reports Java/JMeter availability before JMeter-backed validation.
 - `validate_with_jmeter` and `roundtrip_validate` accept either an opened `planId` or a direct JMX path via `path`, `planPath`, or `jmxPath`.
 - Path-based JMeter validation uses the Java bridge when `JMXPLS_JAVA_BRIDGE_JAR` is set. Optional settings are `JMXPLS_JAVA_COMMAND` for a non-default Java executable and `JMXPLS_JAVA_BRIDGE_TIMEOUT_MS` for request timeouts.
-- Without bridge configuration, path-based validation and `get_jmeter_environment` return `JMX_JMETER_BRIDGE_NOT_CONFIGURED`; session-based validation keeps the static fallback diagnostics.
+- Without bridge configuration, path-based validation and `get_jmeter_environment` return `JMX_JMETER_BRIDGE_NOT_CONFIGURED`; session-based validation keeps the static fallback diagnostics. Fallback responses include `nextSuggestedResources`.
 
 Examples:
 
