@@ -299,6 +299,19 @@ describe("stdio JSON-RPC MCP transport", () => {
     });
   });
 
+  it("rejects non-object prompt arguments", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "prompt-args-object",
+      method: "prompts/get",
+      params: { name: "jmeter_plan_review", arguments: "not-an-object" }
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "prompt-args-object",
+      error: { code: -32602, message: "prompt arguments must be an object when present" }
+    });
+  });
+
   it("returns JSON-RPC errors for malformed or invalid requests", async () => {
     await expect(handleJsonRpcMessage("{", server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",

@@ -337,7 +337,13 @@ function promptGetResult(server: ServerLike, params: Record<string, unknown> | u
 }
 
 function promptArguments(value: unknown): Record<string, string> {
-  const args = asObject(value);
+  if (value === undefined) {
+    return {};
+  }
+  if (!isObject(value)) {
+    throw new RpcError(INVALID_PARAMS, "prompt arguments must be an object when present");
+  }
+  const args = value;
   if (Object.values(args).some((item) => typeof item !== "string")) {
     throw new RpcError(INVALID_PARAMS, "prompt arguments must be string values");
   }
@@ -398,10 +404,6 @@ function requiredString(params: Record<string, unknown> | undefined, key: string
     throw new RpcError(INVALID_PARAMS, `${key} is required`);
   }
   return value;
-}
-
-function asObject(value: unknown): Record<string, unknown> {
-  return isObject(value) ? value : {};
 }
 
 function asString(value: unknown): string {
