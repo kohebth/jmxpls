@@ -654,6 +654,25 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(jtlPath, "utf8")).toContain("GET /");
   });
 
+  it("executes JMeter HTML report generation when explicitly requested", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-report-real-"));
+    const jtlPath = join(dir, "results.jtl");
+    const reportDir = join(dir, "dashboard");
+    const executable = join(dir, "jmeter");
+    writeFileSync(jtlPath, "elapsed,label,responseCode,success\n42,GET /,200,true\n");
+    writeFileSync(executable, "#!/bin/sh\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then\n    shift\n    mkdir -p \"$1\"\n    printf '<html>dashboard</html>\\n' > \"$1/index.html\"\n  fi\n  shift\ndone\necho report-generated\n");
+    chmodSync(executable, 0o755);
+
+    const runtime = new JmxplsRuntime();
+    const result = await runtime.callTool("generate_html_report", { jtlPath, outputDir: reportDir, jmeterExecutable: executable, execute: true });
+    expect(result.success).toBe(true);
+    expect((result.data as { executionMode: string }).executionMode).toBe("executed");
+    expect((result.data as { run: { status: string; artifacts: string[]; logs: string[] } }).run.status).toBe("completed");
+    expect((result.data as { run: { artifacts: string[] } }).run.artifacts).toContain(reportDir);
+    expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: report-generated");
+    expect(readFileSync(join(reportDir, "index.html"), "utf8")).toContain("dashboard");
+  });
+
   it("serves and merges component catalogs", async () => {
     const runtime = new JmxplsRuntime();
     const loaded = await runtime.callTool("load_component_catalog");

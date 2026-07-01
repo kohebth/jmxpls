@@ -7,12 +7,12 @@
 The MCP server registers resources, tools, and prompts independently from execution. `JmxplsRuntime` handles executable behavior in layers:
 
 - The base runtime owns open plan sessions, semantic queries, Plan Language views, validation, generic mutations, typed component mutations, and save operations.
-- The enhanced runtime adds run records, JTL analysis, report command planning, raw/plugin-safe operations, catalog tools/resources, and template tools.
+- The enhanced runtime adds run records, guarded JMeter execution/report generation, JTL analysis, raw/plugin-safe operations, catalog tools/resources, and template tools.
 - Catalog and template helpers keep stateful descriptor/template behavior separate from the plan-session runtime.
 
 ## Resource Model
 
-Resources are read-only views over runtime state. Plan resources expose summaries, trees, diagnostics, diffs, and Plan Language projections for opened plans. Catalog resources expose the active merged component catalog. Run resources expose in-memory planned JMeter command records, logs, and artifacts.
+Resources are read-only views over runtime state. Plan resources expose summaries, trees, diagnostics, diffs, and Plan Language projections for opened plans. Catalog resources expose the active merged component catalog. Run resources expose in-memory JMeter command records, logs, status, and artifacts.
 
 ## Execution Boundary
 

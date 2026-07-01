@@ -12,7 +12,7 @@ const EXECUTION_TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   get_run_status: objectSchema(RUN_ID, ["runId"]),
   get_run_logs: objectSchema(RUN_ID, ["runId"]),
   export_run_artifacts: objectSchema(RUN_ID, ["runId"]),
-  generate_html_report: objectSchema({ jtlPath: STRING, path: STRING, outputDir: STRING, reportDir: STRING, jmeterExecutable: STRING }, [], { allOf: [{ anyOf: [{ required: ["jtlPath"] }, { required: ["path"] }] }, { anyOf: [{ required: ["outputDir"] }, { required: ["reportDir"] }] }] }),
+  generate_html_report: objectSchema({ jtlPath: STRING, path: STRING, outputDir: STRING, reportDir: STRING, jmeterExecutable: STRING, execute: BOOLEAN, timeoutMs: NUMBER }, [], { allOf: [{ anyOf: [{ required: ["jtlPath"] }, { required: ["path"] }] }, { anyOf: [{ required: ["outputDir"] }, { required: ["reportDir"] }] }] }),
   analyze_jtl: objectSchema({ path: STRING, jtlPath: STRING, report: BOOLEAN }, [], { anyOf: [{ required: ["path"] }, { required: ["jtlPath"] }] }),
   compare_jtl: objectSchema({ leftPath: STRING, rightPath: STRING, baselinePath: STRING, candidatePath: STRING, left: STRING, right: STRING }, [], { anyOf: [{ required: ["leftPath", "rightPath"] }, { required: ["baselinePath", "candidatePath"] }, { required: ["left", "right"] }] }),
   check_sla: objectSchema({ path: STRING, jtlPath: STRING, maxErrorRate: NUMBER, maxAvgMs: NUMBER, maxP95Ms: NUMBER, minThroughput: NUMBER }, [], { anyOf: [{ required: ["path"] }, { required: ["jtlPath"] }] })

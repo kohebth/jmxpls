@@ -102,7 +102,7 @@ export class JmxplsRuntime extends BaseRuntime {
         case "get_run_status": return this.getRunStatus(input);
         case "get_run_logs": return this.getRunLogs(input);
         case "export_run_artifacts": return this.exportRunArtifacts(input);
-        case "generate_html_report": return this.generateHtmlReport(input);
+        case "generate_html_report": return await this.generateHtmlReport(input);
         case "analyze_jtl": return await analyzeJtl(input);
         case "compare_jtl": return await compareJtl(input);
         case "check_sla": return await checkJtlSla(input);
@@ -256,14 +256,22 @@ export class JmxplsRuntime extends BaseRuntime {
     return run ? { success: true, data: { runId, artifacts: run.artifacts } } : { success: false, error: `Unknown runId: ${runId}` };
   }
 
-  private generateHtmlReport(input: ToolCallInput): ToolCallResult {
+  private async generateHtmlReport(input: ToolCallInput): Promise<ToolCallResult> {
     const jtlPath = requiredPath(input, ["jtlPath", "path"]);
     const outputDir = requiredPath(input, ["outputDir", "reportDir"]);
     const executable = optionalString(input, "jmeterExecutable") ?? "jmeter";
     const command = { executable, args: ["-g", jtlPath, "-o", outputDir] };
     assertAllowedCommand(command);
     const run = this.runs.create({ command, artifacts: [outputDir], logs: [`Prepared JMeter report command: ${command.executable} ${command.args.join(" ")}`] });
-    return { success: true, data: { run, command, executionMode: "planned" } };
+    if (input.execute !== true) {
+      return { success: true, data: { run, command, executionMode: "planned" } };
+    }
+
+    this.runs.setStatus(run.runId, "running");
+    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    appendProcessLogs(this.runs, run.runId, result);
+    this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
+    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };
   }
 
   private validateToolPaths(name: string, input: ToolCallInput): ToolCallResult | undefined {
