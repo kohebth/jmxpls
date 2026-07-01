@@ -246,6 +246,22 @@ describe("stdio JSON-RPC MCP transport", () => {
     });
   });
 
+  it("rejects non-object tool arguments", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "bad-tool-args",
+      method: "tools/call",
+      params: {
+        name: "open_plan",
+        arguments: "not-an-object"
+      }
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "bad-tool-args",
+      error: { code: -32602, message: "arguments must be an object when present" }
+    });
+  });
+
   it("reads resources and gets prompts with MCP content shapes", async () => {
     const resource = await handleJsonRpcMessage(JSON.stringify({
       jsonrpc: "2.0",

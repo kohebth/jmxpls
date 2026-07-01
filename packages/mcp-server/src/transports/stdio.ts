@@ -291,7 +291,17 @@ async function callTool(server: ServerLike, runtime: RuntimeLike, params: Record
   if (!server.tools.some((tool) => tool.name === name)) {
     throw new RpcError(INVALID_PARAMS, `Unknown tool: ${name}`);
   }
-  return runtime.callTool(name, asObject(params?.arguments));
+  return runtime.callTool(name, toolArguments(params?.arguments));
+}
+
+function toolArguments(value: unknown): Record<string, unknown> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isObject(value)) {
+    throw new RpcError(INVALID_PARAMS, "arguments must be an object when present");
+  }
+  return value;
 }
 
 function resourceReadResult(uri: string, result: { success: boolean; data?: unknown; error?: string }): Record<string, unknown> {
