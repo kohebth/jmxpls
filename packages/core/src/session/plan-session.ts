@@ -170,9 +170,11 @@ export class PlanSession {
 }
 
 function sidecarIdentities(current: SemanticPlan, reparsed: SemanticPlan): SidecarNodeIdentity[] {
-  const currentByPath = new Map(flattenSemanticNodes(current.root).map((node) => [node.path, node]));
+  const currentNodes = flattenSemanticNodes(current.root);
+  const currentByPath = new Map(currentNodes.map((node) => [node.path, node]));
+  const currentByName = uniqueNodesByName(currentNodes);
   return flattenSemanticNodes(reparsed.root).map((node) => {
-    const stable = currentByPath.get(node.path);
+    const stable = currentByPath.get(node.path) ?? currentByName.get(node.name);
     return {
       nodeId: stable?.nodeId ?? node.nodeId,
       jmxPath: node.path,
@@ -180,4 +182,12 @@ function sidecarIdentities(current: SemanticPlan, reparsed: SemanticPlan): Sidec
       testName: stable?.name ?? node.name
     };
   });
+}
+
+function uniqueNodesByName(nodes: ReturnType<typeof flattenSemanticNodes>): Map<string, ReturnType<typeof flattenSemanticNodes>[number]> {
+  const counts = new Map<string, number>();
+  for (const node of nodes) {
+    counts.set(node.name, (counts.get(node.name) ?? 0) + 1);
+  }
+  return new Map(nodes.filter((node) => counts.get(node.name) === 1).map((node) => [node.name, node]));
 }

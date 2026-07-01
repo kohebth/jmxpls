@@ -72,7 +72,7 @@ export class JmxplsRuntime {
         case "get_plan_language":
         case "export_plan_language": return this.getPlanLanguage(input);
         case "parse_plan_language": return this.parsePlanLanguage(input);
-        case "import_plan_language": return this.importPlanLanguage(input);
+        case "import_plan_language": return await this.importPlanLanguage(input);
         case "apply_plan_language": return this.applyPlanLanguage(input);
         case "validate_plan_language": return this.validatePlanLanguage(input);
         case "roundtrip_plan_language": return this.withSession(input, (session) => roundTripPlanLanguage(session.semanticPlan()));
@@ -187,6 +187,7 @@ export class JmxplsRuntime {
       const variableNodeIds = optionalString(input, "variable") ? new Set(session.semanticPlan().indexes.variables[optionalString(input, "variable") ?? ""] ?? []) : undefined;
       const matches = flattenSemanticNodes(roots).filter((node) =>
         (role ? node.role === role : true) &&
+        (usesDefaultCompactSamplerScope(input) ? node.type === "HTTPSamplerProxy" : true) &&
         (type ? textMatches(node.type, type, match) : true) &&
         (name ? textMatches(node.name, name, match) : true) &&
         (path ? textMatches(node.path, path, match) : true) &&
@@ -205,7 +206,7 @@ export class JmxplsRuntime {
   }
   private findByVariable(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).filter((node) => new Set(session.semanticPlan().indexes.variables[requiredString(input, "variable")] ?? []).has(node.nodeId))); }
   private findByRequest(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const method = optionalString(input, "method"); const pathContains = optionalString(input, "pathContains") ?? optionalString(input, "path"); const domainContains = optionalString(input, "domainContains") ?? optionalString(input, "domain"); return semanticNodes(session).filter((node) => { if (node.role !== "sampler") return false; const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`; return (method ? searchable.includes(method) : true) && (pathContains ? searchable.includes(pathContains) : true) && (domainContains ? searchable.includes(domainContains) : true); }); }); }
-  private getPlanLanguage(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode; const detail = optionalString(input, "detail") as PlanLanguageDetail | undefined; const redaction = optionalString(input, "redaction") as RedactionMode | undefined; const subtreeNodeId = optionalString(input, "subtreeNodeId") ?? optionalString(input, "nodeId"); const depth = optionalInteger(input, "depth"); const format = optionalString(input, "format") ?? "object"; const document = projectPlanLanguage(session.semanticPlan(), { mode, ...(detail ? { detail } : {}), ...(redaction ? { redaction } : {}), ...(subtreeNodeId ? { subtreeNodeId } : {}), ...(depth !== undefined ? { depth } : {}) }); return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document; }); }
+  private getPlanLanguage(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode; const detail = optionalString(input, "detail") as PlanLanguageDetail | undefined; const redaction = (optionalString(input, "redaction") ?? "standard") as RedactionMode; const subtreeNodeId = optionalString(input, "subtreeNodeId") ?? optionalString(input, "nodeId"); const depth = optionalInteger(input, "depth"); const format = optionalString(input, "format") ?? "object"; const document = projectPlanLanguage(session.semanticPlan(), { mode, ...(detail ? { detail } : {}), redaction, ...(subtreeNodeId ? { subtreeNodeId } : {}), ...(depth !== undefined ? { depth } : {}) }); return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document; }); }
   private validatePlanLanguage(input: ToolCallInput): ToolCallResult {
     const parsed = parsePlanLanguage(requiredString(input, "text"));
     const diagnostics = validatePlanLanguageDocument(parsed.document);
@@ -644,6 +645,19 @@ function findMatchMode(input: ToolCallInput): FindMatchMode {
 function findViewMode(input: ToolCallInput): FindViewMode {
   const value = optionalString(input, "view");
   return value === "compact" || value === "raw" ? value : "full";
+}
+
+function usesDefaultCompactSamplerScope(input: ToolCallInput): boolean {
+  return optionalString(input, "role") === "sampler" &&
+    optionalString(input, "view") === "compact" &&
+    optionalString(input, "subtreeNodeId") !== undefined &&
+    optionalString(input, "type") === undefined &&
+    optionalString(input, "pluginClass") === undefined &&
+    optionalString(input, "variable") === undefined &&
+    optionalString(input, "method") === undefined &&
+    optionalString(input, "requestPath") === undefined &&
+    optionalString(input, "field") === undefined &&
+    optionalString(input, "fieldValue") === undefined;
 }
 
 function textMatches(value: string, pattern: string, mode: FindMatchMode): boolean {

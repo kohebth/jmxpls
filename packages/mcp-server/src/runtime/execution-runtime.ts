@@ -492,7 +492,7 @@ function bridgeResponseData(path: string, mode: JMeterValidationMode, response: 
 
 function pluginAwareDiagnostics(diagnostics: Array<Record<string, unknown>>, reason?: string): Array<Record<string, unknown>> {
   const all = [...diagnostics];
-  const text = `${reason ?? ""} ${diagnostics.map((diagnostic) => String(diagnostic.message ?? "")).join(" ")}`;
+  const text = `${reason ?? ""} ${diagnostics.map(diagnosticMessage).join(" ")}`;
   if (/ClassNotFoundException|NoClassDefFoundError|CannotResolveClassException|missing plugin/i.test(text) && !all.some((diagnostic) => diagnostic.code === "JMX_JMETER_PLUGIN_CLASS_MISSING")) {
     all.push({
       code: "JMX_JMETER_PLUGIN_CLASS_MISSING",
@@ -502,6 +502,10 @@ function pluginAwareDiagnostics(diagnostics: Array<Record<string, unknown>>, rea
     });
   }
   return all;
+}
+
+function diagnosticMessage(diagnostic: Record<string, unknown>): string {
+  return typeof diagnostic.message === "string" ? diagnostic.message : "";
 }
 
 function rawAddInput(input: ToolCallInput): ToolCallInput {

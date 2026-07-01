@@ -80,6 +80,7 @@ function fieldsFromElement(element: JmxElementNode, adapter?: ComponentAdapter):
       tagName: property.tagName,
       value: property.value
     })),
+    ...propertyFields(element),
     ...(adapter?.toFields(element) ?? {})
   };
 
@@ -91,6 +92,10 @@ function fieldsFromElement(element: JmxElementNode, adapter?: ComponentAdapter):
   }
 
   return fields;
+}
+
+function propertyFields(element: JmxElementNode): Record<string, unknown> {
+  return Object.fromEntries(element.properties.flatMap((property) => property.name && property.value !== undefined ? [[property.name, property.value]] : []));
 }
 
 export function inferRole(element: JmxElementNode): SemanticRole {

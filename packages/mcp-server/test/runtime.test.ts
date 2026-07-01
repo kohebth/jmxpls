@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -205,7 +206,7 @@ describe("JmxplsRuntime", () => {
 
   it("imports Plan Language text into a new target plan", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-"));
-    const targetPath = join(dir, "plan.jmx");
+    const targetPath = join(dir, `${randomUUID()}.jmx`);
     const runtime = new JmxplsRuntime();
     const importResult = await runtime.callTool("import_plan_language", {
       targetPath,
@@ -246,7 +247,7 @@ describe("JmxplsRuntime", () => {
 
   it("imports Plan Language in new mode only to a fresh target", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-new-"));
-    const targetPath = join(dir, "plan.jmx");
+    const targetPath = join(dir, `${randomUUID()}.jmx`);
     const text = JSON.stringify({
       format: "jmxpls-plan-language",
       version: 1,

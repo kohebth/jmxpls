@@ -5,6 +5,7 @@ import type { SemanticDiff } from "../model/diff.js";
 import type { SemanticPatch, SemanticPatchOperation } from "../model/patches.js";
 import type { SemanticPlan } from "../model/semantic.js";
 import { diffSemanticPlans } from "../diff/semantic-diff.js";
+import { parsePropertyTree } from "../jmx/property-tree.js";
 import { buildSemanticPlan } from "../semantic/indexer.js";
 import type { XmlElementNode } from "../xml/xml-types.js";
 
@@ -118,7 +119,7 @@ function addNode(tree: HashTreeNode, parentNodeId: string, nodeType: string, fie
     path,
     tagName: nodeType,
     enabled: elementRaw.attributes.enabled !== "false",
-    properties: [],
+    properties: parsePropertyTree(elementRaw),
     raw: elementRaw
   };
 
