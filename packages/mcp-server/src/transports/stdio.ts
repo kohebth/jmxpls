@@ -203,7 +203,7 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
     case "prompts/list":
       return listResult("prompts", server.prompts.map((prompt) => ({ name: prompt.name, description: prompt.description, arguments: prompt.arguments ?? [] })), request.params);
     case "tools/call":
-      return toolCallResult(await runtime.callTool(requiredString(request.params, "name"), asObject(request.params?.arguments)));
+      return toolCallResult(await callTool(server, runtime, request.params));
     case "resources/read":
       return resourceReadResult(requiredString(request.params, "uri"), runtime.readResource(requiredString(request.params, "uri")));
     case "prompts/get":
@@ -284,6 +284,14 @@ function toolCallResult(result: { success: boolean; data?: unknown; error?: stri
     structuredContent: result,
     isError: !result.success
   };
+}
+
+async function callTool(server: ServerLike, runtime: RuntimeLike, params: Record<string, unknown> | undefined): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  const name = requiredString(params, "name");
+  if (!server.tools.some((tool) => tool.name === name)) {
+    throw new RpcError(INVALID_PARAMS, `Unknown tool: ${name}`);
+  }
+  return runtime.callTool(name, asObject(params?.arguments));
 }
 
 function resourceReadResult(uri: string, result: { success: boolean; data?: unknown; error?: string }): Record<string, unknown> {

@@ -218,15 +218,31 @@ describe("stdio JSON-RPC MCP transport", () => {
       id: 2,
       method: "tools/call",
       params: {
-        name: "echo",
+        name: "open_plan",
         arguments: { value: 1 }
       }
     }), server, runtime);
 
     expect(response?.result).toEqual({
-      content: [{ type: "text", text: expect.stringContaining("\"name\": \"echo\"") }],
-      structuredContent: { success: true, data: { name: "echo", input: { value: 1 } } },
+      content: [{ type: "text", text: expect.stringContaining("\"name\": \"open_plan\"") }],
+      structuredContent: { success: true, data: { name: "open_plan", input: { value: 1 } } },
       isError: false
+    });
+  });
+
+  it("returns a protocol error for unknown tools", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "unknown-tool",
+      method: "tools/call",
+      params: {
+        name: "not_registered",
+        arguments: {}
+      }
+    }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "unknown-tool",
+      error: { code: -32602, message: "Unknown tool: not_registered" }
     });
   });
 
