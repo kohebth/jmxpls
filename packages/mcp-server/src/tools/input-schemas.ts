@@ -25,6 +25,7 @@ const TYPED_ADD_BASE = { ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, ...PO
 const HTTP_TARGET_FIELDS = { name: NON_EMPTY_STRING, protocol: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, port: STRING_OR_NUMBER, path: NON_EMPTY_STRING };
 const PLAN_LANGUAGE_OPTIONS = { mode: { type: "string", enum: ["outline", "flow", "semantic", "full"] }, format: { type: "string", enum: ["object", "json", "yaml"] } };
 const PLAN_LANGUAGE_APPLY_OPTIONS = { mode: { type: "string", enum: ["replace", "merge", "patch"] }, dryRun: BOOLEAN, validate: BOOLEAN };
+const PLAN_LANGUAGE_IMPORT_OPTIONS = { mode: { type: "string", enum: ["new", "replace", "merge", "patch"] }, dryRun: BOOLEAN, validate: BOOLEAN };
 const PAGE_OPTIONS = { limit: INTEGER, cursor: NON_EMPTY_STRING, depth: INTEGER, byteBudget: INTEGER, subtreeNodeId: NON_EMPTY_STRING };
 const SOURCE_TEXT_OR_PATH = { text: NON_EMPTY_STRING, path: NON_EMPTY_STRING };
 const EXTRACTOR_BASE = { ...TYPED_ADD_BASE, variableName: NON_EMPTY_STRING, defaultValue: NON_EMPTY_STRING, matchNumber: STRING_OR_NUMBER };
@@ -46,7 +47,7 @@ export const PLAN_LANGUAGE_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
   roundtrip_plan_language: objectSchema(PLAN_ID, ["planId"]),
   explain_plan_language: objectSchema({ ...PLAN_ID, text: NON_EMPTY_STRING }, [], { anyOf: [{ required: ["planId"] }, { required: ["text"] }] }),
   compare_plan_language: objectSchema({ left: NON_EMPTY_STRING, right: NON_EMPTY_STRING }, ["left", "right"]),
-  import_plan_language: objectSchema({ ...SOURCE_TEXT_OR_PATH, targetPath: NON_EMPTY_STRING, ...PLAN_LANGUAGE_APPLY_OPTIONS }, [], { anyOf: [{ required: ["text"] }, { required: ["path"] }] }),
+  import_plan_language: objectSchema({ ...SOURCE_TEXT_OR_PATH, targetPath: NON_EMPTY_STRING, ...PLAN_LANGUAGE_IMPORT_OPTIONS }, [], { anyOf: [{ required: ["text"] }, { required: ["path"] }] }),
   apply_plan_language: objectSchema({ ...PLAN_ID, ...SOURCE_TEXT_OR_PATH, ...PLAN_LANGUAGE_APPLY_OPTIONS }, ["planId"], { anyOf: [{ required: ["text"] }, { required: ["path"] }] })
 };
 

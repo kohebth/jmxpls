@@ -166,6 +166,43 @@ describe("JmxplsRuntime", () => {
     expect(existsSync(targetPath)).toBe(true);
   });
 
+  it("imports Plan Language in new mode only to a fresh target", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-new-"));
+    const targetPath = join(dir, "plan.jmx");
+    const text = JSON.stringify({
+      format: "jmxpls-plan-language",
+      version: 1,
+      mode: "outline",
+      detail: "expanded",
+      name: "new-import",
+      nodes: [{
+        nodeId: "root",
+        role: "testPlan",
+        type: "TestPlan",
+        name: "new import",
+        enabled: true,
+        children: [{
+          nodeId: "tg-new",
+          role: "threadGroup",
+          type: "ThreadGroup",
+          name: "new-mode",
+          enabled: true
+        }]
+      }],
+      warnings: []
+    });
+
+    const runtime = new JmxplsRuntime();
+    const imported = await runtime.callTool("import_plan_language", { targetPath, mode: "new", text });
+    expect(imported.success).toBe(true);
+    expect((imported.data as { mode: string; validation?: { valid: boolean } }).mode).toBe("new");
+    expect((imported.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
+
+    const duplicate = await runtime.callTool("import_plan_language", { targetPath, mode: "new", text });
+    expect(duplicate.success).toBe(false);
+    expect(duplicate.error).toContain("targetPath already exists");
+  });
+
   it("imports Plan Language from a file path", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-import-plan-language-file-"));
     const inputPath = join(dir, "source-plan-language.json");

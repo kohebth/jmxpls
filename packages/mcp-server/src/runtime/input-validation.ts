@@ -29,6 +29,10 @@ const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
   { name: "mode", type: "string", enum: ["replace", "merge", "patch"] },
   ...PATCH_OPTIONALS
 ];
+const PLAN_LANGUAGE_IMPORT_OPTIONALS: FieldRule[] = [
+  { name: "mode", type: "string", enum: ["new", "replace", "merge", "patch"] },
+  ...PATCH_OPTIONALS
+];
 const PAGE_OPTIONALS: FieldRule[] = [{ name: "limit", type: "integer" }, { name: "cursor", type: "string" }, { name: "depth", type: "integer" }, { name: "byteBudget", type: "integer" }, { name: "subtreeNodeId", type: "string" }, { name: "nodeId", type: "string" }];
 const POSITION_OPTIONALS: FieldRule[] = [{ name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS];
 const PARENT_OPTIONALS: FieldRule[] = PARENT_ID_ALIASES;
@@ -89,7 +93,7 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   export_plan_language: { required: [PLAN_ID], optional: [{ name: "mode", type: "string", enum: ["outline", "flow", "semantic", "full"] }, { name: "format", type: "string", enum: ["object", "json", "yaml"] }] },
   validate_plan_language: { required: [{ name: "text", type: "string" }] },
   parse_plan_language: { required: [{ name: "text", type: "string" }] },
-  import_plan_language: { requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: [{ name: "targetPath", type: "string" }, ...PLAN_LANGUAGE_APPLY_OPTIONALS] },
+  import_plan_language: { requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: [{ name: "targetPath", type: "string" }, ...PLAN_LANGUAGE_IMPORT_OPTIONALS] },
   apply_plan_language: { required: [PLAN_ID], requiredOneOf: [PLAN_LANGUAGE_SOURCE_OPTIONAL], optional: PLAN_LANGUAGE_APPLY_OPTIONALS },
   roundtrip_plan_language: { required: [PLAN_ID] },
   explain_plan_language: { requiredOneOf: [[PLAN_ID, { name: "text", type: "string" }]] },

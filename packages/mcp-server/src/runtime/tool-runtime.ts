@@ -25,6 +25,7 @@ const PLAN_LANGUAGE_ROLES = new Set(["testPlan", "threadGroup", "controller", "s
 const PLAN_LANGUAGE_MODES = new Set(["outline", "flow", "semantic", "full"]);
 const PLAN_LANGUAGE_DETAILS = new Set(["compact", "expanded", "lossless-references", "raw-linked"]);
 const PLAN_LANGUAGE_APPLY_MODES = new Set(["replace", "merge", "patch"]);
+const PLAN_LANGUAGE_IMPORT_MODES = new Set(["new", "replace", "merge", "patch"]);
 
 const MINIMAL_PLAN_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 <jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
@@ -38,6 +39,7 @@ const MINIMAL_PLAN_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 </jmeterTestPlan>`;
 
 type PlanLanguageApplyMode = "replace" | "merge" | "patch";
+type PlanLanguageImportMode = PlanLanguageApplyMode | "new";
 type FindMatchMode = "contains" | "exact" | "regex" | "fuzzy";
 type FindViewMode = "compact" | "full" | "raw";
 
@@ -233,10 +235,10 @@ export class JmxplsRuntime {
       return { success: false, error: `Invalid plan language document: ${parsed.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}` };
     }
 
-    const mode = this.planLanguageApplyMode(input);
-    const targetPath = this.resolveImportTargetPath(optionalString(input, "targetPath"));
+    const mode = this.planLanguageImportMode(input);
+    const targetPath = this.resolveImportTargetPath(optionalString(input, "targetPath"), mode === "new");
     const session = await this.sessions.openPlan(targetPath);
-    const result = this.applyPlanLanguageDocument(session, parsed.document, mode, input, true);
+    const result = this.applyPlanLanguageDocument(session, parsed.document, mode === "new" ? "replace" : mode, input, true);
     return {
       ...result,
       data: {
@@ -404,9 +406,19 @@ export class JmxplsRuntime {
     }
     return "patch";
   }
-  private resolveImportTargetPath(requestedPath?: string): string {
+  private planLanguageImportMode(input: ToolCallInput): PlanLanguageImportMode {
+    const inputMode = optionalString(input, "mode");
+    if (typeof inputMode === "string" && PLAN_LANGUAGE_IMPORT_MODES.has(inputMode)) {
+      return inputMode as PlanLanguageImportMode;
+    }
+    return "patch";
+  }
+  private resolveImportTargetPath(requestedPath?: string, requireNew = false): string {
     if (requestedPath) {
       const resolved = resolve(requestedPath);
+      if (requireNew && existsSync(resolved)) {
+        throw new Error(`targetPath already exists for new Plan Language import: ${resolved}`);
+      }
       if (!existsSync(resolved)) {
         mkdirSync(dirname(resolved), { recursive: true });
         writeFileSync(resolved, MINIMAL_PLAN_TEMPLATE);
