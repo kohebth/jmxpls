@@ -21,6 +21,7 @@ describe("security helpers", () => {
     audit.record("save", "plan.jmx");
 
     expect(redactRecord({ password: "secret", host: "example.com" }).password).toBe("<redacted>");
+    expect(redactRecord({ nested: { api_key: "abc", value: "kept" } })).toEqual({ nested: { api_key: "<redacted>", value: "kept" } });
     expect(audit.list()).toHaveLength(1);
   });
 
