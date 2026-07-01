@@ -135,6 +135,27 @@ describe("stdio JSON-RPC MCP transport", () => {
     expect((prompts?.result as { prompts: Array<{ name: string; content?: string }> }).prompts.find((prompt) => prompt.name === "jmeter_plan_review")?.content).toBeUndefined();
   });
 
+  it("lists prompt arguments as MCP PromptArgument objects", async () => {
+    const response = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "prompts", method: "prompts/list" }), {
+      resources: [],
+      tools: [],
+      prompts: [{
+        name: "review_plan",
+        description: "Review a plan.",
+        content: "Review {{planId}}",
+        arguments: ["planId"]
+      }]
+    }, runtime);
+
+    expect(response?.result).toEqual({
+      prompts: [{
+        name: "review_plan",
+        description: "Review a plan.",
+        arguments: [{ name: "planId" }]
+      }]
+    });
+  });
+
   it("paginates MCP list methods with opaque cursors", async () => {
     const firstTools = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools-1", method: "tools/list" }), server, runtime);
     const firstToolPage = firstTools?.result as { tools: Array<{ name: string }>; nextCursor?: string };

@@ -1,8 +1,14 @@
+export type PromptArgumentDescriptor = {
+  name: string;
+  description?: string;
+  required?: boolean;
+};
+
 export type PromptDescriptor = {
   name: string;
   description: string;
   content: string;
-  arguments?: string[];
+  arguments?: Array<string | PromptArgumentDescriptor>;
 };
 
 export class PromptRegistry {

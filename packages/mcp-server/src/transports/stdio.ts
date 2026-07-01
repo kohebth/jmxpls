@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline";
 
 import { createJmxplsServer } from "../server.js";
+import type { PromptArgumentDescriptor, PromptDescriptor } from "../prompts/registry.js";
 import { JmxplsRuntime } from "../runtime/execution-runtime.js";
 
 const JSONRPC_VERSION = "2.0";
@@ -202,7 +203,7 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
     case "resources/templates/list":
       return listResult("resourceTemplates", resourceTemplates(server.resources), request.params);
     case "prompts/list":
-      return listResult("prompts", server.prompts.map((prompt) => ({ name: prompt.name, description: prompt.description, arguments: prompt.arguments ?? [] })), request.params);
+      return listResult("prompts", server.prompts.map(promptListItem), request.params);
     case "tools/call":
       return toolCallResult(await callTool(server, runtime, request.params));
     case "resources/read":
@@ -257,6 +258,14 @@ function resourceTemplates(resources: ServerLike["resources"]): ServerLike["reso
 
 function isTemplatedUri(uri: string): boolean {
   return uri.includes("{");
+}
+
+function promptListItem(prompt: PromptDescriptor): { name: string; description: string; arguments: PromptArgumentDescriptor[] } {
+  return {
+    name: prompt.name,
+    description: prompt.description,
+    arguments: (prompt.arguments ?? []).map((argument) => typeof argument === "string" ? { name: argument } : argument)
+  };
 }
 
 function listResult<T>(key: string, items: T[], params: Record<string, unknown> | undefined): Record<string, unknown> {
