@@ -14,6 +14,10 @@ The MCP server registers resources, tools, and prompts independently from execut
 
 Resources are read-only views over runtime state. Plan resources expose summaries, trees, diagnostics, diffs, and Plan Language projections for opened plans. Catalog resources expose the active merged component catalog. Run resources expose in-memory JMeter command records, logs, status, and artifacts.
 
+## Identity Sidecars
+
+JMX does not carry stable node IDs. On save, `jmxpls` writes `<plan>.jmxpls.meta.json` with current stable node IDs, JMX paths, fingerprints, and names. On open, matching sidecar fingerprints are reapplied to the canonical tree so semantic resources, diffs, and patches can keep stable IDs across reloads while the `.jmx` remains valid without the sidecar.
+
 ## Execution Boundary
 
 Execution tools prepare allowlisted JMeter CLI commands and record planned runs by default. When callers pass `execute: true`, the runtime executes the allowlisted JMeter command without a shell, records stdout/stderr, updates run status, and exposes artifacts through run resources. JTL analysis tools parse CSV result files directly. JMeter-backed validation remains a guarded Java bridge integration point.

@@ -1,10 +1,12 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { loadSidecar, reconcileSidecar, saveSidecar } from "../src/index.js";
+import { flattenSemanticNodes, loadSidecar, reconcileSidecar, saveSidecar, SessionManager } from "../src/index.js";
+
+const root = resolve(import.meta.dirname, "../../..");
 
 describe("sidecar store", () => {
   it("loads missing sidecars without diagnostics", async () => {
@@ -46,5 +48,32 @@ describe("sidecar store", () => {
     );
 
     expect(reconciled[0]?.nodeId).toBe("stable");
+  });
+
+  it("saves sidecars and reapplies stable node IDs on reopen", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-sidecar-session-"));
+    const planPath = join(dir, "plan.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const sessions = new SessionManager();
+    const session = await sessions.openPlan(planPath);
+    const rootNodeId = session.semanticPlan().root[0]?.nodeId;
+    expect(rootNodeId).toBeTruthy();
+    session.applyPatch({
+      operations: [{
+        op: "addNode",
+        parentNodeId: rootNodeId!,
+        nodeId: "stable-users",
+        nodeType: "ThreadGroup",
+        fields: { name: "Stable Users", enabled: true }
+      }]
+    });
+
+    const saved = await session.save(planPath, false);
+    expect(saved.sidecarPath).toBe(`${planPath}.jmxpls.meta.json`);
+
+    const reopened = await new SessionManager().openPlan(planPath);
+    const nodeIds = flattenSemanticNodes(reopened.semanticPlan().root).map((node) => node.nodeId);
+    expect(nodeIds).toContain("stable-users");
   });
 });

@@ -3,13 +3,15 @@ import type { Diagnostic } from "../model/diagnostics.js";
 import type { SemanticDiff } from "../model/diff.js";
 import type { SemanticPatch } from "../model/patches.js";
 import type { SemanticPlan } from "../model/semantic.js";
-import type { SidecarDocument } from "../model/sidecar.js";
+import type { SidecarDocument, SidecarNodeIdentity } from "../model/sidecar.js";
 import { applyCanonicalPatch } from "../patch/canonical-patch.js";
 import { buildSemanticPlan } from "../semantic/indexer.js";
+import { flattenSemanticNodes } from "../semantic/summarizer.js";
 import { validatePlan, type ValidationResult } from "../validation/validator.js";
 import { serializeJmxDocument } from "../jmx/hash-tree-serializer.js";
 import { loadXml } from "../xml/load-xml.js";
 import { parseHashTreeDocument } from "../jmx/hash-tree-parser.js";
+import { saveSidecar, sidecarPathFor } from "../jmx/sidecar-store.js";
 import { atomicWriteFile } from "../io/atomic-writer.js";
 import { backupFile } from "../io/backup.js";
 import { RevisionLog } from "./revision-log.js";
@@ -30,6 +32,7 @@ export type SavePlanResult = {
   backupPath?: string;
   revision: number;
   validation: ValidationResult;
+  sidecarPath?: string;
 };
 
 export class PlanSession {
@@ -120,6 +123,7 @@ export class PlanSession {
       return { path, revision: this.revision, validation };
     }
 
+    const currentSemantic = this.semanticPlan();
     const serialized = serializeJmxDocument(this.state.canonical);
     const reparsed = parseHashTreeDocument(loadXml(serialized));
     const parseBlocking = reparsed.diagnostics.some((diagnostic) => diagnostic.severity === "error" || diagnostic.severity === "fatal");
@@ -141,10 +145,12 @@ export class PlanSession {
     }
 
     await atomicWriteFile(path, serialized);
+    const sidecar = await saveSidecar(path, sidecarIdentities(currentSemantic, buildSemanticPlan(reparsed)));
     this.state.sourcePath = path;
+    this.state.sidecar = sidecar;
     this.state.dirty = false;
     const revision = this.revisions.next("save");
-    const saved: SavePlanResult = { path, revision, validation };
+    const saved: SavePlanResult = { path, revision, validation, sidecarPath: sidecarPathFor(path) };
     if (backupPath) {
       saved.backupPath = backupPath;
     }
@@ -161,4 +167,17 @@ export class PlanSession {
       diagnostics: this.state.diagnostics
     };
   }
+}
+
+function sidecarIdentities(current: SemanticPlan, reparsed: SemanticPlan): SidecarNodeIdentity[] {
+  const currentByPath = new Map(flattenSemanticNodes(current.root).map((node) => [node.path, node]));
+  return flattenSemanticNodes(reparsed.root).map((node) => {
+    const stable = currentByPath.get(node.path);
+    return {
+      nodeId: stable?.nodeId ?? node.nodeId,
+      jmxPath: node.path,
+      fingerprint: node.nodeId,
+      testName: stable?.name ?? node.name
+    };
+  });
 }
