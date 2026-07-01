@@ -392,6 +392,47 @@ describe("JmxplsRuntime", () => {
     expect((found.data as { nextSuggestedResources: string[] }).nextSuggestedResources[0]).toContain("cursor=2");
   });
 
+  it("preserves unknown plugin nodes through move and save", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-unknown-plugin-"));
+    const planPath = join(dir, "unknown-plugin.jmx");
+    copyFileSync(resolve(root, "fixtures/plugins/unknown-plugin.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+
+    const unknownNodes = await runtime.callTool("find_nodes", { planId, type: "com.example.UnknownPlugin" });
+    const unknownNodeId = (unknownNodes.data as Array<{ nodeId: string }>)[0]?.nodeId;
+    expect(unknownNodeId).toBeTruthy();
+
+    const testPlan = await runtime.callTool("add_node", {
+      planId,
+      parentNodeId: "root",
+      nodeType: "TestPlan",
+      fields: { name: "Plugin Preservation Harness", enabled: true, guiClass: "TestPlanGui" }
+    });
+    expect(testPlan.success).toBe(true);
+
+    const testPlans = await runtime.callTool("find_nodes", { planId, type: "TestPlan" });
+    const testPlanNodeId = (testPlans.data as Array<{ nodeId: string }>)[0]?.nodeId;
+    expect(testPlanNodeId).toBeTruthy();
+
+    const moved = await runtime.callTool("move_node", { planId, nodeId: unknownNodeId, toParentNodeId: testPlanNodeId });
+    expect(moved.success).toBe(true);
+
+    const saved = await runtime.callTool("save_plan", { planId, backup: false });
+    expect(saved.success).toBe(true);
+    expect(readFileSync(planPath, "utf8")).toContain("<stringProp name=\"custom.value\">kept</stringProp>");
+
+    const reopened = await runtime.callTool("reload_plan", { planId });
+    expect(reopened.success).toBe(true);
+    const reopenedPlanId = (reopened.data as { planId: string }).planId;
+    const preserved = await runtime.callTool("find_nodes", { planId: reopenedPlanId, type: "com.example.UnknownPlugin" });
+    const preservedNode = (preserved.data as Array<{ nodeId: string; fields: { properties: Array<{ name: string; value: string }> } }>)[0];
+    expect(preservedNode?.fields.properties).toContainEqual(expect.objectContaining({ name: "custom.value", value: "kept" }));
+  });
+
   it("supports dry-run plan-language application without mutating sessions", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-dry-run-"));
     const planPath = join(dir, "minimal.jmx");
