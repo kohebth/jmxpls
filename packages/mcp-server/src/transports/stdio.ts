@@ -146,6 +146,10 @@ export function resolvePromptTemplate(template: string, args: Record<string, unk
 }
 
 async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: RuntimeLike, session?: JsonRpcMcpSession): Promise<JsonRpcResponse | undefined> {
+  if (isJsonRpcResponse(parsed)) {
+    return undefined;
+  }
+
   const requestError = validateRequest(parsed);
   if (requestError) {
     return errorResponse(requestId(parsed), requestError.code, requestError.message);
@@ -331,6 +335,20 @@ function validateRequest(value: unknown): { code: number; message: string } | un
     return { code: INVALID_PARAMS, message: "params must be an object when present" };
   }
   return undefined;
+}
+
+function isJsonRpcResponse(value: unknown): boolean {
+  if (!isObject(value) || value.jsonrpc !== JSONRPC_VERSION || !("id" in value) || "method" in value) {
+    return false;
+  }
+  const hasValidId = value.id === null || typeof value.id === "string" || typeof value.id === "number";
+  if (!hasValidId) {
+    return false;
+  }
+  if ("result" in value) {
+    return !("error" in value);
+  }
+  return isObject(value.error) && typeof value.error.code === "number" && typeof value.error.message === "string";
 }
 
 function successResponse(id: JsonRpcId, result: Record<string, unknown>): JsonRpcResponse {

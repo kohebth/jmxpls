@@ -186,6 +186,24 @@ describe("stdio JSON-RPC MCP transport", () => {
     ]), server, runtime)).resolves.toBeUndefined();
   });
 
+  it("accepts JSON-RPC response messages without replying", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "server-request",
+      result: {}
+    }), server, runtime)).resolves.toBeUndefined();
+
+    const response = await handleJsonRpcMessage(JSON.stringify([
+      { jsonrpc: "2.0", id: "server-request", result: {} },
+      { jsonrpc: "2.0", id: "ping", method: "ping" },
+      { jsonrpc: "2.0", id: "server-error", error: { code: -32603, message: "client-side failure" } }
+    ]), server, runtime);
+
+    expect(response).toEqual([
+      { jsonrpc: "2.0", id: "ping", result: {} }
+    ]);
+  });
+
   it("returns an invalid request error for empty JSON-RPC batches", async () => {
     await expect(handleJsonRpcMessage("[]", server, runtime)).resolves.toEqual({
       jsonrpc: "2.0",
