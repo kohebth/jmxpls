@@ -54,6 +54,20 @@ describe("sidecar store", () => {
     expect(reconciled[0]?.nodeId).toBe("stable");
   });
 
+  it("reconciles stale fingerprints by matching paths", () => {
+    const reconciled = reconcileSidecar(
+      {
+        schemaVersion: 1,
+        sourcePath: "plan.jmx",
+        updatedAt: new Date().toISOString(),
+        nodes: [{ nodeId: "stable", jmxPath: "/same", fingerprint: "old", testName: "Users" }]
+      },
+      [{ nodeId: "new", jmxPath: "/same", fingerprint: "new", testName: "Users" }]
+    );
+
+    expect(reconciled[0]).toMatchObject({ nodeId: "stable", fingerprint: "new", jmxPath: "/same" });
+  });
+
   it("saves sidecars and reapplies stable node IDs on reopen", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-sidecar-session-"));
     const planPath = join(dir, "plan.jmx");

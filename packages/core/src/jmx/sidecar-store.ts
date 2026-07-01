@@ -50,9 +50,10 @@ export function reconcileSidecar(sidecar: SidecarDocument | undefined, currentNo
   }
 
   const byFingerprint = new Map(sidecar.nodes.map((node) => [node.fingerprint, node]));
+  const byPath = new Map(sidecar.nodes.map((node) => [node.jmxPath, node]));
 
   return currentNodes.map((node) => {
-    const existing = byFingerprint.get(node.fingerprint);
+    const existing = byFingerprint.get(node.fingerprint) ?? byPath.get(node.jmxPath);
     return existing ? { ...node, nodeId: existing.nodeId } : node;
   });
 }
