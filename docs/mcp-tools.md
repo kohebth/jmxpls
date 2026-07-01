@@ -28,7 +28,7 @@ Resources provide read-only, progressive disclosure views for plans, catalogs, r
 
 ## Semantic Mutations
 
-Use `add_node`, `update_node_field`, `delete_node`, `move_node`, `clone_node`, `enable_node`, `disable_node`, or `apply_semantic_patch` for generic tree edits. Mutation inputs accept `dryRun` and `validate` where applicable. Save changes with `save_plan` or `save_plan_as`.
+Use `add_node`, `update_node_field`, `delete_node`, `move_node`, `clone_node`, `enable_node`, `disable_node`, or `apply_semantic_patch` for generic tree edits. Semantic mutations validate before commit by default; pass `validate: false` only for deliberate unsafe/raw workflows. Mutation inputs accept `dryRun` and `validate` where applicable. Save changes with `save_plan` or `save_plan_as`.
 
 ## Typed Component Tools
 

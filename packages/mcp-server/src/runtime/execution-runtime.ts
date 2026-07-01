@@ -543,7 +543,7 @@ function isOpenPlanSummary(value: unknown): value is OpenPlanSummary {
 }
 
 function patchFlags(input: ToolCallInput): ToolCallInput {
-  return { ...(typeof input.dryRun === "boolean" ? { dryRun: input.dryRun } : {}), ...(typeof input.validate === "boolean" ? { validate: input.validate } : {}) };
+  return { validate: typeof input.validate === "boolean" ? input.validate : false, ...(typeof input.dryRun === "boolean" ? { dryRun: input.dryRun } : {}) };
 }
 
 function compactThresholds(values: Record<keyof SlaThresholds, number | undefined>): SlaThresholds {

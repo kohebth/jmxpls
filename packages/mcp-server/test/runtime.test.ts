@@ -535,6 +535,37 @@ describe("JmxplsRuntime", () => {
     expect(readFileSync(planPath, "utf8")).toContain("<TestPlan ");
   });
 
+  it("validates semantic edits by default while raw edits opt out", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-safe-edits-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+
+    const semantic = await runtime.callTool("add_node", {
+      planId,
+      parentNodeId: rootNodeId,
+      nodeType: "ThreadGroup",
+      fields: { name: "Validated Users", enabled: true }
+    });
+    expect(semantic.success).toBe(true);
+    expect((semantic.data as { validation?: { valid: boolean } }).validation?.valid).toBe(true);
+
+    const raw = await runtime.callTool("update_raw_property", {
+      planId,
+      nodeId: rootNodeId,
+      propertyPath: "name",
+      value: "Raw Unsafe Name"
+    });
+    expect(raw.success).toBe(true);
+    expect((raw.data as { validation?: unknown }).validation).toBeUndefined();
+  });
+
   it("returns a configured diagnostic for path-based JMeter validation without a bridge", async () => {
     const previousJar = process.env.JMXPLS_JAVA_BRIDGE_JAR;
     delete process.env.JMXPLS_JAVA_BRIDGE_JAR;
