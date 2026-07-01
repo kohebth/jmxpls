@@ -30,6 +30,7 @@ export type JsonRpcResponse = {
     data?: unknown;
   };
 };
+export type JsonRpcMessageResponse = JsonRpcResponse | JsonRpcResponse[];
 
 type RuntimeLike = Pick<JmxplsRuntime, "callTool" | "readResource">;
 type ServerLike = ReturnType<typeof createJmxplsServer>;
@@ -52,7 +53,7 @@ export function runStdioServer(): void {
   });
 }
 
-export async function handleJsonRpcMessage(line: string, server: ServerLike = createJmxplsServer(), runtime: RuntimeLike = new JmxplsRuntime()): Promise<JsonRpcResponse | undefined> {
+export async function handleJsonRpcMessage(line: string, server: ServerLike = createJmxplsServer(), runtime: RuntimeLike = new JmxplsRuntime()): Promise<JsonRpcMessageResponse | undefined> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
@@ -60,6 +61,28 @@ export async function handleJsonRpcMessage(line: string, server: ServerLike = cr
     return errorResponse(null, PARSE_ERROR, "Parse error", errorMessage(error));
   }
 
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) {
+      return errorResponse(null, INVALID_REQUEST, "Invalid Request");
+    }
+    const responses = (await Promise.all(parsed.map((item) => handleJsonRpcValue(item, server, runtime)))).filter((response): response is JsonRpcResponse => response !== undefined);
+    return responses.length > 0 ? responses : undefined;
+  }
+
+  return handleJsonRpcValue(parsed, server, runtime);
+}
+
+export function resolvePromptTemplate(template: string, args: Record<string, unknown>): string {
+  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, key) => {
+    if (typeof key !== "string") {
+      return match;
+    }
+    const value = args[key];
+    return value === undefined ? match : asString(value);
+  });
+}
+
+async function handleJsonRpcValue(parsed: unknown, server: ServerLike, runtime: RuntimeLike): Promise<JsonRpcResponse | undefined> {
   const requestError = validateRequest(parsed);
   if (requestError) {
     return errorResponse(requestId(parsed), requestError.code, requestError.message);
@@ -81,17 +104,7 @@ export async function handleJsonRpcMessage(line: string, server: ServerLike = cr
   }
 }
 
-export function resolvePromptTemplate(template: string, args: Record<string, unknown>): string {
-  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (match, key) => {
-    if (typeof key !== "string") {
-      return match;
-    }
-    const value = args[key];
-    return value === undefined ? match : asString(value);
-  });
-}
-
-async function handleLine(line: string, server: ServerLike, runtime: RuntimeLike, write: (response: JsonRpcResponse) => void): Promise<void> {
+async function handleLine(line: string, server: ServerLike, runtime: RuntimeLike, write: (response: JsonRpcMessageResponse) => void): Promise<void> {
   const response = await handleJsonRpcMessage(line, server, runtime);
   if (response) {
     write(response);
@@ -225,10 +238,14 @@ function requestId(value: unknown): JsonRpcId {
 function isShutdownMessage(line: string): boolean {
   try {
     const request = JSON.parse(line) as unknown;
-    return isObject(request) && (request.method === "shutdown" || request.method === "exit");
+    return Array.isArray(request) ? request.some(isShutdownRequest) : isShutdownRequest(request);
   } catch {
     return false;
   }
+}
+
+function isShutdownRequest(request: unknown): boolean {
+  return isObject(request) && (request.method === "shutdown" || request.method === "exit");
 }
 
 function requiredString(params: Record<string, unknown> | undefined, key: string): string {

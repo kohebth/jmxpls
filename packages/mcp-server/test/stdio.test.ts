@@ -94,6 +94,34 @@ describe("stdio JSON-RPC MCP transport", () => {
     expect((prompts?.result as { prompts: Array<{ name: string; content?: string }> }).prompts.find((prompt) => prompt.name === "jmeter_plan_review")?.content).toBeUndefined();
   });
 
+  it("handles JSON-RPC batch requests and omits notification responses", async () => {
+    const response = await handleJsonRpcMessage(JSON.stringify([
+      { jsonrpc: "2.0", id: "ping", method: "ping" },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: "tools", method: "tools/list" }
+    ]), server, runtime);
+
+    expect(response).toEqual([
+      { jsonrpc: "2.0", id: "ping", result: {} },
+      { jsonrpc: "2.0", id: "tools", result: { tools: expect.any(Array) } }
+    ]);
+  });
+
+  it("returns no batch response when every item is a notification", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify([
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", method: "notifications/progress" }
+    ]), server, runtime)).resolves.toBeUndefined();
+  });
+
+  it("returns an invalid request error for empty JSON-RPC batches", async () => {
+    await expect(handleJsonRpcMessage("[]", server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "Invalid Request" }
+    });
+  });
+
   it("calls tools with MCP content and structured content", async () => {
     const response = await handleJsonRpcMessage(JSON.stringify({
       jsonrpc: "2.0",
