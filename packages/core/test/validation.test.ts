@@ -16,6 +16,20 @@ describe("validation and catalog", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("reports unknown plugin components with actionable recovery guidance", () => {
+    const canonical = parseHashTreeDocument(loadXml(readFileSync(resolve(root, "fixtures/plugins/unknown-plugin.jmx"))));
+    const semantic = buildSemanticPlan(canonical);
+    const result = validatePlan(canonical, semantic);
+
+    expect(result.valid).toBe(true);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "JMX_UNKNOWN_COMPONENT",
+      severity: "info",
+      message: expect.stringContaining("com.example.UnknownPlugin"),
+      fixSuggestion: expect.stringContaining("plugin jar")
+    }));
+  });
+
   it("validates raw XML patches", () => {
     expect(validateRawPatch({ nodeId: "node-1", propertyPath: "x", xmlFragment: "<stringProp/>" })).toEqual([]);
     expect(validateRawPatch({ nodeId: "node-1", propertyPath: "x", xmlFragment: "<stringProp>" }).length).toBeGreaterThan(0);

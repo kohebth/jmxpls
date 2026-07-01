@@ -69,7 +69,8 @@ function unknownComponentDiagnostic(node: SemanticNode, registry: ComponentRegis
     severity: "info",
     message: `No typed descriptor found for ${node.type}; raw preservation will be used.`,
     nodeId: node.nodeId,
-    jmxPath: node.path
+    jmxPath: node.path,
+    fixSuggestion: "Load the plugin jar/classpath and refresh the component catalog, import a matching catalog entry, or use explicit raw tools for this node."
   }];
 }
 
