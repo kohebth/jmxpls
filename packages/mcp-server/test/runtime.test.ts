@@ -816,6 +816,7 @@ describe("JmxplsRuntime", () => {
     const run = await runtime.callTool("run_jmeter", { planPath, jtlPath });
     expect(run.success).toBe(true);
     const runId = (run.data as { run: { runId: string } }).run.runId;
+    expect((run.data as { nextSuggestedResources: string[] }).nextSuggestedResources).toContain(`jmxpls://runs/${runId}/logs`);
 
     const status = await runtime.callTool("get_run_status", { runId });
     expect((status.data as { artifacts: string[] }).artifacts).toContain(jtlPath);
@@ -846,6 +847,7 @@ describe("JmxplsRuntime", () => {
     expect(result.success).toBe(true);
     expect((result.data as { executionMode: string; run: { status: string; logs: string[] } }).executionMode).toBe("executed");
     expect((result.data as { run: { status: string } }).run.status).toBe("completed");
+    expect((result.data as { nextSuggestedResources: string[]; run: { runId: string } }).nextSuggestedResources).toContain(`jmxpls://runs/${(result.data as { run: { runId: string } }).run.runId}/artifacts`);
     expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: executed-jmeter");
     expect((result.data as { run: { process: { exitCode: number; stdout: string; stderr: string } } }).run.process).toEqual({ exitCode: 0, stdout: "executed-jmeter", stderr: "" });
     expect(readFileSync(jtlPath, "utf8")).toContain("GET /");
@@ -865,6 +867,7 @@ describe("JmxplsRuntime", () => {
     expect(result.success).toBe(true);
     expect((result.data as { executionMode: string }).executionMode).toBe("executed");
     expect((result.data as { run: { status: string; artifacts: string[]; logs: string[] } }).run.status).toBe("completed");
+    expect((result.data as { nextSuggestedResources: string[]; run: { runId: string } }).nextSuggestedResources).toContain(`jmxpls://runs/${(result.data as { run: { runId: string } }).run.runId}/artifacts`);
     expect((result.data as { run: { artifacts: string[] } }).run.artifacts).toContain(reportDir);
     expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: report-generated");
     expect((result.data as { run: { process: { exitCode: number; stdout: string; stderr: string } } }).run.process).toEqual({ exitCode: 0, stdout: "report-generated", stderr: "" });

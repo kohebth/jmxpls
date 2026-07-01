@@ -260,7 +260,7 @@ export class JmxplsRuntime extends BaseRuntime {
     assertAllowedCommand(command);
     const run = this.runs.create({ command, artifacts: [jtlPath], logs: [`Prepared JMeter command: ${command.executable} ${command.args.join(" ")}`] });
     if (input.execute !== true) {
-      return { success: true, data: { run, command, executionMode: "planned" } };
+      return { success: true, data: { run, command, executionMode: "planned", nextSuggestedResources: runSuggestedResources(run.runId) } };
     }
 
     this.runs.setStatus(run.runId, "running");
@@ -268,7 +268,7 @@ export class JmxplsRuntime extends BaseRuntime {
     this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
     this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
-    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };
+    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode, nextSuggestedResources: runSuggestedResources(run.runId) } };
   }
 
   private stopRun(input: ToolCallInput): ToolCallResult {
@@ -303,7 +303,7 @@ export class JmxplsRuntime extends BaseRuntime {
     assertAllowedCommand(command);
     const run = this.runs.create({ command, artifacts: [outputDir], logs: [`Prepared JMeter report command: ${command.executable} ${command.args.join(" ")}`] });
     if (input.execute !== true) {
-      return { success: true, data: { run, command, executionMode: "planned" } };
+      return { success: true, data: { run, command, executionMode: "planned", nextSuggestedResources: runSuggestedResources(run.runId) } };
     }
 
     this.runs.setStatus(run.runId, "running");
@@ -311,7 +311,7 @@ export class JmxplsRuntime extends BaseRuntime {
     this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
     this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
-    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode } };
+    return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode, nextSuggestedResources: runSuggestedResources(run.runId) } };
   }
 
   private validateToolPaths(name: string, input: ToolCallInput): ToolCallResult | undefined {
@@ -460,6 +460,10 @@ function bridgeEnvironmentNotConfigured(): ToolCallResult {
       nextSuggestedResources: ["jmxpls://audit"]
     }
   };
+}
+
+function runSuggestedResources(runId: string): string[] {
+  return [`jmxpls://runs/${runId}`, `jmxpls://runs/${runId}/logs`, `jmxpls://runs/${runId}/artifacts`, "jmxpls://audit"];
 }
 
 function bridgeResponseData(path: string, mode: JMeterValidationMode, response: BridgeResponse<{ path: string; valid?: boolean; reason?: string }>): Record<string, unknown> {
