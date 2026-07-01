@@ -24,6 +24,29 @@ final class MainTest {
     }
 
     @Test
+    void reportsConfiguredJMeterHome() throws Exception {
+        Path home = Files.createTempDirectory("jmxpls-jmeter-home-");
+        Path bin = Files.createDirectories(home.resolve("bin"));
+        Path executable = bin.resolve(System.getProperty("os.name", "").toLowerCase().contains("win") ? "jmeter.bat" : "jmeter");
+        Files.writeString(executable, "");
+        executable.toFile().setExecutable(true);
+        String previous = System.getProperty("jmxpls.jmeter.home");
+        System.setProperty("jmxpls.jmeter.home", home.toString());
+        try {
+            String response = new BridgeServer(System.in, System.out).handle("{\"id\":\"env\",\"command\":\"environment\"}");
+
+            assertTrue(response.contains("\"status\":\"jmeter-configured\""));
+            assertTrue(response.contains("jmeter"));
+        } finally {
+            if (previous == null) {
+                System.clearProperty("jmxpls.jmeter.home");
+            } else {
+                System.setProperty("jmxpls.jmeter.home", previous);
+            }
+        }
+    }
+
+    @Test
     void rejectsUnknownCommands() {
         String response = new BridgeServer(System.in, System.out).handle("{\"id\":\"3\",\"command\":\"missing\"}");
 
@@ -52,5 +75,17 @@ final class MainTest {
         assertTrue(response.contains("\"success\":true"));
         assertTrue(response.contains("\"valid\":false"));
         assertTrue(response.contains("JMX_BRIDGE_INVALID_JMX"));
+    }
+
+    @Test
+    void reportsMissingPluginClasses() throws Exception {
+        Path plan = Files.createTempFile("jmxpls-bridge-plugin-", ".jmx");
+        Files.writeString(plan, "<jmeterTestPlan><hashTree><com.example.UnknownPlugin testclass=\"com.example.UnknownPlugin\" /></hashTree></jmeterTestPlan>");
+
+        String response = new BridgeServer(System.in, System.out).handle("{\"id\":\"6\",\"command\":\"validateJmx\",\"path\":\"" + plan + "\"}");
+
+        assertTrue(response.contains("\"success\":true"));
+        assertTrue(response.contains("\"valid\":false"));
+        assertTrue(response.contains("JMX_JMETER_PLUGIN_CLASS_MISSING"));
     }
 }

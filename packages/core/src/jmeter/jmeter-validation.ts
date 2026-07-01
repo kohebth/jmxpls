@@ -23,6 +23,6 @@ export async function validateWithJMeter(
   return {
     valid: response.success && response.data?.valid === true,
     mode: request.mode,
-    diagnostics: response.diagnostics
+    diagnostics: [...response.diagnostics, ...(response.data?.diagnostics ?? [])]
   };
 }

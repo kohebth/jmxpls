@@ -28,6 +28,7 @@ export type BridgeJmxResult = {
   path: string;
   valid?: boolean;
   reason?: string;
+  diagnostics?: Diagnostic[];
 };
 
 export type BridgeClientOptions = {
