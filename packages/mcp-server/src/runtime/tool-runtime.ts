@@ -172,15 +172,26 @@ export class JmxplsRuntime {
       const role = optionalString(input, "role") as SemanticRole | undefined;
       const type = optionalString(input, "type");
       const name = optionalString(input, "name");
+      const path = optionalString(input, "path");
       const parentNodeId = optionalString(input, "parentNodeId");
       const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined;
       const match = findMatchMode(input);
       const view = findViewMode(input);
       const roots = scopedRoots(session.semanticPlan().root, optionalString(input, "subtreeNodeId") ?? optionalString(input, "nodeId"));
+      const allNodes = semanticNodes(session);
+      const nodesById = new Map(allNodes.map((node) => [node.nodeId, node]));
+      const variableNodeIds = optionalString(input, "variable") ? new Set(session.semanticPlan().indexes.variables[optionalString(input, "variable") ?? ""] ?? []) : undefined;
       const matches = flattenSemanticNodes(roots).filter((node) =>
         (role ? node.role === role : true) &&
         (type ? textMatches(node.type, type, match) : true) &&
         (name ? textMatches(node.name, name, match) : true) &&
+        (path ? textMatches(node.path, path, match) : true) &&
+        (variableNodeIds ? variableNodeIds.has(node.nodeId) : true) &&
+        matchesRequestFilters(node, input, match) &&
+        matchesPluginClass(node, optionalString(input, "pluginClass"), match) &&
+        matchesParentFilters(node, nodesById.get(node.parentNodeId ?? ""), input, match) &&
+        matchesChildFilters(node, input, match) &&
+        matchesFieldFilters(node, input, match) &&
         (parentNodeId ? node.parentNodeId === parentNodeId : true) &&
         (enabled === undefined ? true : node.enabled === enabled)
       );
@@ -631,6 +642,78 @@ function textMatches(value: string, pattern: string, mode: FindMatchMode): boole
     default:
       return value.includes(pattern);
   }
+}
+
+function matchesRequestFilters(node: SemanticNode, input: ToolCallInput, mode: FindMatchMode): boolean {
+  const method = optionalString(input, "method");
+  const requestPath = optionalString(input, "requestPath") ?? optionalString(input, "pathContains");
+  const domain = optionalString(input, "domain") ?? optionalString(input, "domainContains");
+  if (!method && !requestPath && !domain) {
+    return true;
+  }
+  if (node.role !== "sampler") {
+    return false;
+  }
+  const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`;
+  return (method ? textMatches(fieldText(node, "method") ?? searchable, method, mode) : true) &&
+    (requestPath ? textMatches(fieldText(node, "path") ?? searchable, requestPath, mode) : true) &&
+    (domain ? textMatches(fieldText(node, "domain") ?? searchable, domain, mode) : true);
+}
+
+function matchesPluginClass(node: SemanticNode, pluginClass: string | undefined, mode: FindMatchMode): boolean {
+  if (!pluginClass) {
+    return true;
+  }
+  const candidates = [node.type, fieldText(node, "testclass"), fieldText(node, "classname"), fieldText(node, "guiClass")].filter((value): value is string => value !== undefined);
+  return candidates.some((candidate) => textMatches(candidate, pluginClass, mode));
+}
+
+function matchesParentFilters(node: SemanticNode, parent: SemanticNode | undefined, input: ToolCallInput, mode: FindMatchMode): boolean {
+  const role = optionalString(input, "parentRole");
+  const type = optionalString(input, "parentType");
+  const name = optionalString(input, "parentName");
+  if (!role && !type && !name) {
+    return true;
+  }
+  return parent !== undefined &&
+    (role ? parent.role === role : true) &&
+    (type ? textMatches(parent.type, type, mode) : true) &&
+    (name ? textMatches(parent.name, name, mode) : true);
+}
+
+function matchesChildFilters(node: SemanticNode, input: ToolCallInput, mode: FindMatchMode): boolean {
+  const role = optionalString(input, "childRole");
+  const type = optionalString(input, "childType");
+  const name = optionalString(input, "childName");
+  if (!role && !type && !name) {
+    return true;
+  }
+  return node.children.some((child) =>
+    (role ? child.role === role : true) &&
+    (type ? textMatches(child.type, type, mode) : true) &&
+    (name ? textMatches(child.name, name, mode) : true)
+  );
+}
+
+function matchesFieldFilters(node: SemanticNode, input: ToolCallInput, mode: FindMatchMode): boolean {
+  const field = optionalString(input, "field");
+  const fieldValue = optionalString(input, "fieldValue");
+  if (!field && !fieldValue) {
+    return true;
+  }
+  return Object.entries(node.fields).some(([key, value]) =>
+    (field ? textMatches(key, field, mode) : true) &&
+    (fieldValue ? textMatches(String(value), fieldValue, mode) : true)
+  );
+}
+
+function fieldText(node: SemanticNode, field: string): string | undefined {
+  for (const [key, value] of Object.entries(node.fields)) {
+    if (key === field || key.endsWith(`.${field}`)) {
+      return String(value);
+    }
+  }
+  return undefined;
 }
 
 function fuzzyMatches(value: string, pattern: string): boolean {

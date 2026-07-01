@@ -408,7 +408,8 @@ describe("JmxplsRuntime", () => {
     const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
     const checkoutId = (threadGroups.data as Array<{ name: string; nodeId: string }>).find((node) => node.name === "Checkout Users")?.nodeId;
     expect(checkoutId).toBeDefined();
-    await runtime.callTool("add_http_request", { planId, parentNodeId: checkoutId, method: "GET", path: "/checkout" });
+    await runtime.callTool("add_http_request", { planId, parentNodeId: checkoutId, method: "GET", domain: "${apiHost}", path: "/checkout" });
+    await runtime.callTool("add_node", { planId, parentNodeId: checkoutId, nodeType: "com.example.CustomSampler", fields: { name: "Custom Plugin Sampler", enabled: true, classname: "com.example.CustomSampler", customField: "custom-value" } });
 
     const exact = await runtime.callTool("find_nodes", { planId, name: "Checkout Users", match: "exact" });
     expect((exact.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["Checkout Users"]);
@@ -429,6 +430,24 @@ describe("JmxplsRuntime", () => {
 
     const raw = await runtime.callTool("find_nodes", { planId, role: "sampler", subtreeNodeId: checkoutId, view: "raw" });
     expect((raw.data as { items: Array<{ rawRef: string }> }).items[0]?.rawRef).toContain("jmxpls://raw/");
+
+    const byPath = await runtime.callTool("find_nodes", { planId, path: "/ThreadGroup" });
+    expect((byPath.data as Array<{ name: string }>).map((node) => node.name)).toContain("Checkout Users");
+
+    const byVariable = await runtime.callTool("find_nodes", { planId, variable: "apiHost" });
+    expect((byVariable.data as Array<{ name: string }>).map((node) => node.name)).toContain("GET /checkout");
+
+    const byRequest = await runtime.callTool("find_nodes", { planId, method: "GET", requestPath: "/checkout", domain: "apiHost" });
+    expect((byRequest.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["GET /checkout"]);
+
+    const byPlugin = await runtime.callTool("find_nodes", { planId, pluginClass: "com.example.CustomSampler", field: "customField", fieldValue: "custom-value" });
+    expect((byPlugin.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["Custom Plugin Sampler"]);
+
+    const byParent = await runtime.callTool("find_nodes", { planId, parentName: "Checkout Users", requestPath: "/checkout" });
+    expect((byParent.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["GET /checkout"]);
+
+    const byChild = await runtime.callTool("find_nodes", { planId, name: "Checkout Users", childType: "HTTPSamplerProxy" });
+    expect((byChild.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["Checkout Users"]);
   });
 
   it("preserves unknown plugin nodes through move and save", async () => {

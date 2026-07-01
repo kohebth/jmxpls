@@ -16,6 +16,7 @@ Resources provide read-only, progressive disclosure views for plans, catalogs, r
 
 - `open_plan` opens a `.jmx` file and returns a `planId`, compact summary, diagnostics, and default resource URI.
 - `list_tree`, `get_node`, `find_nodes`, `find_by_variable`, `find_by_request`, and `find_disabled_nodes` inspect the semantic tree without returning raw XML.
+- `find_nodes` supports `match: contains|exact|regex|fuzzy`, subtree scope, compact/full/raw views, and filters for role, type, name, JMX path, variable usage, request method/path/domain, plugin class, parent/child relationship, and semantic field values.
 - `explain_execution_flow` returns the effective execution order from the semantic plan.
 
 ## Plan Language
