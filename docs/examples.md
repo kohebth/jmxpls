@@ -1,6 +1,40 @@
 # Examples
 
-Open a plan, read `get_plan_language` in outline mode, query target nodes, apply a dry-run semantic patch, validate, save atomically, run JMeter in CLI mode, then analyze the JTL output.
+Open a plan, inspect compact resources, apply a semantic change, validate, save atomically, plan a JMeter run, then analyze JTL output.
+
+## Open, Mutate, Validate, Save
+
+```json
+{"name":"open_plan","arguments":{"path":"/workspace/plans/load-test.jmx"}}
+```
+
+Read the returned `defaultResource`, then page the tree:
+
+```json
+{"name":"list_tree","arguments":{"planId":"<planId>","limit":50,"depth":2}}
+```
+
+Disable a node without editing XML:
+
+```json
+{"name":"disable_node","arguments":{"planId":"<planId>","nodeId":"<nodeId>"}}
+```
+
+Review the semantic diff and save:
+
+```json
+{"uri":"jmxpls://plans/<planId>/diff/semantic"}
+```
+
+```json
+{"name":"validate_plan","arguments":{"planId":"<planId>"}}
+```
+
+```json
+{"name":"save_plan","arguments":{"planId":"<planId>","backup":true}}
+```
+
+## Templates
 
 Inspect template metadata first to avoid guessing fields for a new template:
 
@@ -48,4 +82,14 @@ For plugin-adjacent starters, use:
 
 ```json
 {"name":"instantiate_template","arguments":{"name":"tcp_smoke_test","planId":"<planId>","server":"localhost","text":"ping","port":80,"dryRun":true,"apply":true}}
+```
+
+## Run and Analyze
+
+```json
+{"name":"run_jmeter","arguments":{"planPath":"/workspace/plans/load-test.jmx","jtlPath":"/workspace/results/load-test.jtl"}}
+```
+
+```json
+{"name":"analyze_jtl","arguments":{"jtlPath":"/workspace/results/load-test.jtl"}}
 ```

@@ -17,6 +17,21 @@ corepack pnpm -r test
 cd packages/java-bridge && gradle test
 ```
 
+Run the MCP server locally after building:
+
+```bash
+corepack pnpm -C packages/mcp-server build
+node packages/mcp-server/dist/index.js
+```
+
+Typical agent workflow:
+
+1. Call `open_plan` with a workspace `.jmx` path.
+2. Read the returned `defaultResource`, usually `plan-language/outline`.
+3. Use `list_tree`, `find_nodes`, or template tools to identify targets.
+4. Apply semantic tools such as `disable_node` or `instantiate_template`.
+5. Read `jmxpls://plans/<planId>/diff/semantic`, then `validate_plan` and `save_plan`.
+
 ## Project Documents
 
 - `requirements.md` defines product behavior and acceptance criteria.
