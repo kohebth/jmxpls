@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,6 +39,7 @@ type RuntimeOptions = {
 
 export class JmxplsRuntime extends BaseRuntime {
   private readonly runs = new RunManager();
+  private readonly activeProcesses = new Map<string, ChildProcess>();
   private readonly catalogTools = new CatalogToolRuntime();
   private readonly templateTools = new TemplateToolRuntime();
   private readonly auditLog = new AuditLog();
@@ -193,7 +194,7 @@ export class JmxplsRuntime extends BaseRuntime {
         return { success: true, data: bridgeResponseData(path, mode, response) };
       }
       const result = await validateWithJMeter(bridge, { path, mode });
-      return { success: true, data: { path, mode: result.mode, jmeterBacked: true, valid: result.valid, diagnostics: result.diagnostics } };
+      return { success: true, data: { path, mode: result.mode, jmeterBacked: true, valid: result.valid, diagnostics: pluginAwareDiagnostics(result.diagnostics), nextSuggestedResources: ["jmxpls://audit"] } };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown JMeter bridge validation error" };
     } finally {
@@ -264,15 +265,21 @@ export class JmxplsRuntime extends BaseRuntime {
     }
 
     this.runs.setStatus(run.runId, "running");
-    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"), (child) => this.activeProcesses.set(run.runId, child), () => this.runs.get(run.runId)?.status === "stopped");
+    this.activeProcesses.delete(run.runId);
     this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
-    this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
+    this.runs.setStatus(run.runId, result.cancelled ? "stopped" : result.exitCode === 0 ? "completed" : "failed");
     return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode, nextSuggestedResources: runSuggestedResources(run.runId) } };
   }
 
   private stopRun(input: ToolCallInput): ToolCallResult {
     const runId = requiredString(input, "runId");
+    const active = this.activeProcesses.get(runId);
+    if (active) {
+      this.runs.appendLog(runId, "Stop requested for active JMeter process");
+      active.kill();
+    }
     const stopped = this.runs.stop(runId);
     return stopped ? { success: true, data: this.runs.get(runId) } : { success: false, error: `Unknown runId: ${runId}` };
   }
@@ -307,14 +314,15 @@ export class JmxplsRuntime extends BaseRuntime {
     }
 
     this.runs.setStatus(run.runId, "running");
-    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
+    const result = await executeCommand(command, optionalNumber(input, "timeoutMs"), (child) => this.activeProcesses.set(run.runId, child), () => this.runs.get(run.runId)?.status === "stopped");
+    this.activeProcesses.delete(run.runId);
     this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
     const indexPath = join(outputDir, "index.html");
     if (result.exitCode === 0 && existsSync(indexPath)) {
       this.runs.addArtifact(run.runId, indexPath);
     }
-    this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
+    this.runs.setStatus(run.runId, result.cancelled ? "stopped" : result.exitCode === 0 ? "completed" : "failed");
     return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode, nextSuggestedResources: runSuggestedResources(run.runId) } };
   }
 
@@ -476,9 +484,24 @@ function bridgeResponseData(path: string, mode: JMeterValidationMode, response: 
     mode,
     jmeterBacked: true,
     valid: response.success && response.data?.valid === true,
-    diagnostics: response.diagnostics,
-    bridge: response.data ?? null
+    diagnostics: pluginAwareDiagnostics(response.diagnostics, response.data?.reason),
+    bridge: response.data ?? null,
+    nextSuggestedResources: ["jmxpls://audit"]
   };
+}
+
+function pluginAwareDiagnostics(diagnostics: Array<Record<string, unknown>>, reason?: string): Array<Record<string, unknown>> {
+  const all = [...diagnostics];
+  const text = `${reason ?? ""} ${diagnostics.map((diagnostic) => String(diagnostic.message ?? "")).join(" ")}`;
+  if (/ClassNotFoundException|NoClassDefFoundError|CannotResolveClassException|missing plugin/i.test(text) && !all.some((diagnostic) => diagnostic.code === "JMX_JMETER_PLUGIN_CLASS_MISSING")) {
+    all.push({
+      code: "JMX_JMETER_PLUGIN_CLASS_MISSING",
+      severity: "error",
+      message: "JMeter could not load one or more plugin classes required by this plan.",
+      fixSuggestion: "Install the missing JMeter plugin jars on the bridge classpath, then rerun validate_with_jmeter in strict mode."
+    });
+  }
+  return all;
 }
 
 function rawAddInput(input: ToolCallInput): ToolCallInput {
@@ -536,18 +559,28 @@ function assertAllowedCommand(command: JMeterCommand): void {
   }
 }
 
-type ProcessResult = { exitCode: number; stdout: string; stderr: string };
+type ProcessResult = { exitCode: number; stdout: string; stderr: string; signal?: string | null; timedOut?: boolean; cancelled?: boolean };
 
-function executeCommand(command: JMeterCommand, timeoutMs?: number): Promise<ProcessResult> {
+function executeCommand(command: JMeterCommand, timeoutMs?: number, onChild?: (child: ChildProcess) => void, isCancelled: () => boolean = () => false): Promise<ProcessResult> {
   return new Promise((resolve) => {
-    execFile(command.executable, command.args, { timeout: timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
-      const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "number" ? error.code : error ? 1 : 0;
-      resolve({ exitCode: code, stdout: stdout.trim(), stderr: stderr.trim() });
+    const child = execFile(command.executable, command.args, { timeout: timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+      const cancelled = isCancelled();
+      const timedOut = !cancelled && timeoutMs !== undefined && timeoutMs > 0 && isKilledProcessError(error);
+      const code = cancelled ? 130 : timedOut ? 124 : typeof error === "object" && error !== null && "code" in error && typeof error.code === "number" ? error.code : error ? 1 : 0;
+      const signal = processSignal(error);
+      resolve({ exitCode: code, stdout: stdout.trim(), stderr: stderr.trim(), ...(signal !== undefined ? { signal } : {}), ...(timedOut ? { timedOut } : {}), ...(cancelled ? { cancelled } : {}) });
     });
+    onChild?.(child);
   });
 }
 
 function appendProcessLogs(runs: RunManager, runId: string, result: ProcessResult): void {
+  if (result.cancelled) {
+    runs.appendLog(runId, "JMeter process was cancelled");
+  }
+  if (result.timedOut) {
+    runs.appendLog(runId, "JMeter process timed out");
+  }
   if (result.stdout) {
     runs.appendLog(runId, `stdout: ${result.stdout}`);
   }
@@ -555,6 +588,14 @@ function appendProcessLogs(runs: RunManager, runId: string, result: ProcessResul
     runs.appendLog(runId, `stderr: ${result.stderr}`);
   }
   runs.appendLog(runId, `JMeter process exited with code ${result.exitCode}`);
+}
+
+function isKilledProcessError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "killed" in error && error.killed === true;
+}
+
+function processSignal(error: unknown): string | null | undefined {
+  return typeof error === "object" && error !== null && "signal" in error && (typeof error.signal === "string" || error.signal === null) ? error.signal : undefined;
 }
 
 function isAllowedJMeterExecutableName(executable: string): boolean {

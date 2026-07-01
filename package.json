@@ -15,6 +15,7 @@
     "test:e2e": "cd packages/mcp-server && vitest run test/e2e/workflow.test.ts",
     "test:fuzz": "corepack pnpm -r test",
     "test:compatibility": "corepack pnpm -r test",
+    "compatibility:report": "node scripts/render-compatibility-report.mjs",
     "typecheck": "corepack pnpm -r typecheck",
     "lint": "corepack pnpm -r lint",
     "bridge:build": "cd packages/java-bridge && gradle build"

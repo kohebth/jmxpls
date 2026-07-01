@@ -19,6 +19,9 @@ export type RunProcessResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
+  signal?: string | null;
+  timedOut?: boolean;
+  cancelled?: boolean;
 };
 
 export type CreateRunOptions = {

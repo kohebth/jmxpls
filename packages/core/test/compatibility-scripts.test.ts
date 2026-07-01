@@ -19,11 +19,12 @@ describe("compatibility scripts", () => {
 
   it("renders deterministic compatibility report metadata", () => {
     const matrix = compatibilityMatrix(["5.4.3", "5.6.3"]);
-    const report = JSON.parse(renderCompatibilityReport(matrix)) as { generatedAt: string; matrix: Array<{ version: string; checks: string[]; reportPath: string }> };
+    const report = JSON.parse(renderCompatibilityReport(matrix)) as { generatedAt: string; matrix: Array<{ version: string; checks: Array<{ name: string; command: string; required: boolean }>; reportPath: string }> };
 
     expect(report.generatedAt).toBe("1970-01-01T00:00:00.000Z");
     expect(report.matrix.map((item) => item.version)).toEqual(["5.4.3", "5.6.3"]);
-    expect(report.matrix[0]?.checks).toEqual(["bridge-validation", "serializer-roundtrip", "mcp-runtime-smoke"]);
+    expect(report.matrix[0]?.checks.map((check) => check.name)).toEqual(["bridge-validation", "serializer-roundtrip", "mcp-runtime-smoke"]);
+    expect(report.matrix[0]?.checks.every((check) => check.required && check.command.length > 0)).toBe(true);
     expect(report.matrix[0]?.reportPath).toBe("compatibility/jmeter-5.4.3.json");
   });
 });

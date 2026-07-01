@@ -7,6 +7,9 @@
   "bin": {
     "jmxpls": "dist/index.js"
   },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepack": "tsc -p tsconfig.json",

@@ -26,7 +26,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: cd packages/java-bridge && gradle test
-      - run: mkdir -p compatibility && printf '{"jmeter":"%s","status":"configured"}\n' '${{ matrix.jmeter }}' > compatibility/jmeter-${{ matrix.jmeter }}.json
+      - run: node scripts/render-compatibility-report.mjs '${{ matrix.jmeter }}' compatibility
       - uses: actions/upload-artifact@v4
         with:
           name: compatibility-jmeter-${{ matrix.jmeter }}

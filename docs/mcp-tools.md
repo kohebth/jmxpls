@@ -48,7 +48,7 @@ High-value typed tools generate semantic patches for common JMeter elements:
 - `get_jmeter_environment` probes the configured Java bridge and reports Java/JMeter availability before JMeter-backed validation.
 - `validate_with_jmeter` and `roundtrip_validate` accept either an opened `planId` or a direct JMX path via `path`, `planPath`, or `jmxPath`.
 - Path-based JMeter validation uses the Java bridge when `JMXPLS_JAVA_BRIDGE_JAR` is set. Optional settings are `JMXPLS_JAVA_COMMAND` for a non-default Java executable and `JMXPLS_JAVA_BRIDGE_TIMEOUT_MS` for request timeouts.
-- Without bridge configuration, path-based validation and `get_jmeter_environment` return `JMX_JMETER_BRIDGE_NOT_CONFIGURED`; session-based validation keeps the static fallback diagnostics. Fallback responses include `nextSuggestedResources`.
+- Without bridge configuration, path-based validation and `get_jmeter_environment` return `JMX_JMETER_BRIDGE_NOT_CONFIGURED`; session-based validation keeps the static fallback diagnostics. Fallback responses include `nextSuggestedResources`. Bridge diagnostics that mention missing plugin classes are enriched with `JMX_JMETER_PLUGIN_CLASS_MISSING`.
 
 Examples:
 
@@ -62,8 +62,8 @@ Examples:
 
 ## Execution and Reports
 
-- `run_jmeter` creates a planned non-GUI command record for `jmeter -n -t <planPath> -l <jtlPath>` and returns a `runId`. Pass `execute: true` to run the allowlisted command without a shell and record structured `process.exitCode`, `process.stdout`, `process.stderr`, status, logs, and artifacts.
-- `get_run_status`, `get_run_logs`, `export_run_artifacts`, and `stop_run` operate on in-memory run records.
+- `run_jmeter` creates a planned non-GUI command record for `jmeter -n -t <planPath> -l <jtlPath>` and returns a `runId`. Pass `execute: true` to run the allowlisted command without a shell and record structured `process.exitCode`, `process.stdout`, `process.stderr`, optional `process.signal`, `process.timedOut`, `process.cancelled`, status, logs, and artifacts.
+- `get_run_status`, `get_run_logs`, `export_run_artifacts`, and `stop_run` operate on in-memory run records. `stop_run` requests cancellation for active JMeter processes and leaves stopped runs with cancellation metadata when the process exits.
 - `generate_html_report` creates a planned report command for `jmeter -g <jtlPath> -o <outputDir>`. Pass `execute: true` to generate the dashboard with the same allowlisted, no-shell execution path and record the report directory plus generated `index.html` when present.
 - Run and report responses include `nextSuggestedResources` for the run status, logs, artifacts, and audit resources.
 - `analyze_jtl`, `compare_jtl`, and `check_sla` parse JTL CSV output and return metrics including errors, throughput, percentiles, response codes, and per-label summaries.
