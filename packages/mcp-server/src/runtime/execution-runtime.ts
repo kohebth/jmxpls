@@ -310,6 +310,10 @@ export class JmxplsRuntime extends BaseRuntime {
     const result = await executeCommand(command, optionalNumber(input, "timeoutMs"));
     this.runs.setProcessResult(run.runId, result);
     appendProcessLogs(this.runs, run.runId, result);
+    const indexPath = join(outputDir, "index.html");
+    if (result.exitCode === 0 && existsSync(indexPath)) {
+      this.runs.addArtifact(run.runId, indexPath);
+    }
     this.runs.setStatus(run.runId, result.exitCode === 0 ? "completed" : "failed");
     return { success: true, data: { run: this.runs.get(run.runId), command, executionMode: "executed", exitCode: result.exitCode, nextSuggestedResources: runSuggestedResources(run.runId) } };
   }

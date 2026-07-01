@@ -869,6 +869,7 @@ describe("JmxplsRuntime", () => {
     expect((result.data as { run: { status: string; artifacts: string[]; logs: string[] } }).run.status).toBe("completed");
     expect((result.data as { nextSuggestedResources: string[]; run: { runId: string } }).nextSuggestedResources).toContain(`jmxpls://runs/${(result.data as { run: { runId: string } }).run.runId}/artifacts`);
     expect((result.data as { run: { artifacts: string[] } }).run.artifacts).toContain(reportDir);
+    expect((result.data as { run: { artifacts: string[] } }).run.artifacts).toContain(join(reportDir, "index.html"));
     expect((result.data as { run: { logs: string[] } }).run.logs).toContain("stdout: report-generated");
     expect((result.data as { run: { process: { exitCode: number; stdout: string; stderr: string } } }).run.process).toEqual({ exitCode: 0, stdout: "report-generated", stderr: "" });
     expect(readFileSync(join(reportDir, "index.html"), "utf8")).toContain("dashboard");
