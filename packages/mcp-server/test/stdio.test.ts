@@ -111,6 +111,37 @@ describe("stdio JSON-RPC MCP transport", () => {
     expect((prompts?.result as { prompts: Array<{ name: string; content?: string }> }).prompts.find((prompt) => prompt.name === "jmeter_plan_review")?.content).toBeUndefined();
   });
 
+  it("paginates MCP list methods with opaque cursors", async () => {
+    const firstTools = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools-1", method: "tools/list" }), server, runtime);
+    const firstToolPage = firstTools?.result as { tools: Array<{ name: string }>; nextCursor?: string };
+    expect(firstToolPage.tools).toHaveLength(50);
+    expect(firstToolPage.nextCursor).toBe("50");
+
+    const secondTools = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools-2", method: "tools/list", params: { cursor: firstToolPage.nextCursor } }), server, runtime);
+    const secondToolPage = secondTools?.result as { tools: Array<{ name: string }>; nextCursor?: string };
+    expect(secondToolPage.tools[0]?.name).toBe(server.tools[50]?.name);
+
+    const resources = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "resources-page", method: "resources/list", params: { cursor: "1" } }), server, runtime);
+    const resourcePage = resources?.result as { resources: Array<{ uri: string }> };
+    expect(resourcePage.resources[0]?.uri).toBe("jmxpls://catalog");
+
+    const templates = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "templates-page", method: "resources/templates/list", params: { cursor: "1" } }), server, runtime);
+    const templatePage = templates?.result as { resourceTemplates: Array<{ uriTemplate: string }> };
+    expect(templatePage.resourceTemplates[0]?.uriTemplate).toBe("jmxpls://plans/{planId}/tree");
+
+    const prompts = await handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "prompts-page", method: "prompts/list", params: { cursor: "1" } }), server, runtime);
+    const promptPage = prompts?.result as { prompts: Array<{ name: string }> };
+    expect(promptPage.prompts[0]?.name).toBe(server.prompts[1]?.name);
+  });
+
+  it("rejects invalid pagination cursors", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify({ jsonrpc: "2.0", id: "bad-cursor", method: "tools/list", params: { cursor: "abc" } }), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: "bad-cursor",
+      error: { code: -32602, message: "cursor must be a non-negative integer" }
+    });
+  });
+
   it("handles JSON-RPC batch requests and omits notification responses", async () => {
     const response = await handleJsonRpcMessage(JSON.stringify([
       { jsonrpc: "2.0", id: "ping", method: "ping" },
@@ -120,7 +151,7 @@ describe("stdio JSON-RPC MCP transport", () => {
 
     expect(response).toEqual([
       { jsonrpc: "2.0", id: "ping", result: {} },
-      { jsonrpc: "2.0", id: "tools", result: { tools: expect.any(Array) } }
+      { jsonrpc: "2.0", id: "tools", result: expect.objectContaining({ tools: expect.any(Array) }) }
     ]);
   });
 
@@ -243,7 +274,7 @@ describe("stateful stdio MCP lifecycle", () => {
     });
 
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))).resolves.toBeUndefined();
-    expect((await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ready", method: "tools/list" })))?.result).toEqual({ tools: expect.any(Array) });
+    expect((await session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ready", method: "tools/list" })))?.result).toEqual(expect.objectContaining({ tools: expect.any(Array) }));
   });
 
   it("enters shutdown state and closes only after exit notification", async () => {

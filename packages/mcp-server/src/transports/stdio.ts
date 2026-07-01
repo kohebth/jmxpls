@@ -13,6 +13,7 @@ const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
 const SERVER_SHUTTING_DOWN = -32000;
 const SERVER_NOT_INITIALIZED = -32002;
+const LIST_PAGE_SIZE = 50;
 
 type JsonRpcId = string | number | null;
 type JsonRpcRequest = {
@@ -190,13 +191,13 @@ async function dispatchRequest(request: JsonRpcRequest, server: ServerLike, runt
     case "ping":
       return {};
     case "tools/list":
-      return { tools: server.tools };
+      return listResult("tools", server.tools, request.params);
     case "resources/list":
-      return { resources: concreteResources(server.resources) };
+      return listResult("resources", concreteResources(server.resources), request.params);
     case "resources/templates/list":
-      return { resourceTemplates: resourceTemplates(server.resources) };
+      return listResult("resourceTemplates", resourceTemplates(server.resources), request.params);
     case "prompts/list":
-      return { prompts: server.prompts.map((prompt) => ({ name: prompt.name, description: prompt.description, arguments: prompt.arguments ?? [] })) };
+      return listResult("prompts", server.prompts.map((prompt) => ({ name: prompt.name, description: prompt.description, arguments: prompt.arguments ?? [] })), request.params);
     case "tools/call":
       return toolCallResult(await runtime.callTool(requiredString(request.params, "name"), asObject(request.params?.arguments)));
     case "resources/read":
@@ -241,6 +242,26 @@ function resourceTemplates(resources: ServerLike["resources"]): ServerLike["reso
 
 function isTemplatedUri(uri: string): boolean {
   return uri.includes("{");
+}
+
+function listResult<T>(key: string, items: T[], params: Record<string, unknown> | undefined): Record<string, unknown> {
+  const start = cursorStart(params);
+  const next = start + LIST_PAGE_SIZE;
+  return {
+    [key]: items.slice(start, next),
+    ...(next < items.length ? { nextCursor: String(next) } : {})
+  };
+}
+
+function cursorStart(params: Record<string, unknown> | undefined): number {
+  const cursor = params?.cursor;
+  if (cursor === undefined) {
+    return 0;
+  }
+  if (typeof cursor !== "string" || !/^(0|[1-9]\d*)$/.test(cursor)) {
+    throw new RpcError(INVALID_PARAMS, "cursor must be a non-negative integer");
+  }
+  return Number(cursor);
 }
 
 function toolCallResult(result: { success: boolean; data?: unknown; error?: string }): Record<string, unknown> {
