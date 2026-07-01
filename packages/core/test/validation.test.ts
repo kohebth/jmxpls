@@ -30,6 +30,32 @@ describe("validation and catalog", () => {
     }));
   });
 
+  it("normalizes validation diagnostics with node, path, and fix guidance", () => {
+    const canonical = parseHashTreeDocument(loadXml(readFileSync(resolve(root, "fixtures/plugins/unknown-plugin.jmx"))));
+    const semantic = buildSemanticPlan(canonical);
+    const result = validatePlan(canonical, semantic);
+    const diagnostic = result.diagnostics.find((item) => item.code === "JMX_UNKNOWN_COMPONENT");
+
+    expect(diagnostic).toEqual(expect.objectContaining({
+      nodeId: expect.any(String),
+      jmxPath: expect.stringContaining("/"),
+      fixSuggestion: expect.any(String)
+    }));
+  });
+
+  it("normalizes plan-level diagnostics with fallback location and fix guidance", () => {
+    const canonical = parseHashTreeDocument(loadXml(readFileSync(resolve(root, "fixtures/jmx/minimal.jmx"))));
+    canonical.diagnostics.push({ code: "JMX_HASH_TREE_ORPHAN", severity: "error", message: "orphan hashTree" });
+    const result = validatePlan(canonical, buildSemanticPlan(canonical));
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "JMX_HASH_TREE_ORPHAN",
+      nodeId: "plan",
+      jmxPath: "/",
+      fixSuggestion: expect.stringContaining("hashTree")
+    }));
+  });
+
   it("labels script text as untrusted plan content", () => {
     const plan: SemanticPlan = {
       name: "scripted",

@@ -2,6 +2,8 @@
 
 Validation combines XML diagnostics, hashTree structure checks, semantic rules, component catalog lookup, policy warnings, security warnings, and optional JMeter-backed validation through the Java bridge.
 
+Validation diagnostics are normalized with `nodeId`, `jmxPath`, and `fixSuggestion`. Parser or plan-level diagnostics that cannot be tied to a semantic node use `nodeId: "plan"` and `jmxPath: "/"`.
+
 ## Static Validation
 
 Use `validate_plan` for the full static suite against an opened `planId`. Use focused tools when narrowing diagnostics: `validate_tree`, `validate_hash_tree`, `validate_component_schema`, `validate_variables`, and `validate_files`.
