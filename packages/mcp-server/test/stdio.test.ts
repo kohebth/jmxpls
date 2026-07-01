@@ -397,7 +397,7 @@ describe("stateful stdio MCP lifecycle", () => {
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "ping", method: "ping" }))).resolves.toEqual({
       jsonrpc: "2.0",
       id: "ping",
-      result: {}
+      error: { code: -32002, message: "Server is not initialized" }
     });
 
     await expect(session.handleMessage(JSON.stringify({ jsonrpc: "2.0", id: "tools", method: "tools/list" }))).resolves.toEqual({

@@ -77,11 +77,11 @@ export class JsonRpcMcpSession {
   }
 
   lifecycleError(request: JsonRpcRequest): { code: number; message: string } | undefined {
-    if (request.method === "ping") {
-      return undefined;
-    }
     if (request.method === "initialize") {
       return this.state === "new" ? undefined : { code: INVALID_REQUEST, message: "Server is already initialized" };
+    }
+    if (request.method === "ping" && this.state !== "new") {
+      return undefined;
     }
     if (this.state !== "ready") {
       return { code: SERVER_NOT_INITIALIZED, message: "Server is not initialized" };
