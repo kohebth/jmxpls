@@ -52,7 +52,19 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   summarize_plan: { required: [PLAN_ID] },
   list_tree: { required: [PLAN_ID], optional: PAGE_OPTIONALS },
   get_node: { required: [PLAN_ID, NODE_ID] },
-  find_nodes: { required: [PLAN_ID], optional: [{ name: "role", type: "string" }, { name: "type", type: "string" }, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }, ...PAGE_OPTIONALS] },
+  find_nodes: {
+    required: [PLAN_ID],
+    optional: [
+      { name: "role", type: "string" },
+      { name: "type", type: "string" },
+      { name: "name", type: "string" },
+      { name: "enabled", type: "boolean" },
+      { name: "match", type: "string", enum: ["contains", "exact", "regex", "fuzzy"] },
+      { name: "view", type: "string", enum: ["compact", "full", "raw"] },
+      { name: "parentNodeId", type: "string" },
+      ...PAGE_OPTIONALS
+    ]
+  },
   find_by_variable: { required: [PLAN_ID, { name: "variable", type: "string" }] },
   find_by_request: { required: [PLAN_ID], optional: [{ name: "method", type: "string" }, { name: "path", type: "string" }, { name: "pathContains", type: "string" }, { name: "domain", type: "string" }, { name: "domainContains", type: "string" }] },
   find_disabled_nodes: { required: [PLAN_ID] },

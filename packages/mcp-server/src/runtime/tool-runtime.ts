@@ -38,6 +38,8 @@ const MINIMAL_PLAN_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 </jmeterTestPlan>`;
 
 type PlanLanguageApplyMode = "replace" | "merge" | "patch";
+type FindMatchMode = "contains" | "exact" | "regex" | "fuzzy";
+type FindViewMode = "compact" | "full" | "raw";
 
 export type ToolCallResult = { success: boolean; data?: unknown; error?: string };
 export type ToolCallInput = Record<string, unknown>;
@@ -165,7 +167,27 @@ export class JmxplsRuntime {
   private async reloadPlan(input: ToolCallInput): Promise<ToolCallResult> { const planId = requiredString(input, "planId"); const existing = this.sessions.get(planId); if (!existing) return { success: false, error: `Unknown planId: ${planId}` }; const sourcePath = existing.sourcePath; this.sessions.closePlan(planId); return this.openPlan({ path: sourcePath }); }
   private closePlan(input: ToolCallInput): ToolCallResult { const planId = requiredString(input, "planId"); return { success: this.sessions.closePlan(planId), data: { planId } }; }
   private getNode(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).find((node) => node.nodeId === requiredString(input, "nodeId")) ?? null); }
-  private findNodes(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const role = optionalString(input, "role") as SemanticRole | undefined; const type = optionalString(input, "type"); const name = optionalString(input, "name"); const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined; const matches = semanticNodes(session).filter((node) => (role ? node.role === role : true) && (type ? node.type.includes(type) : true) && (name ? node.name.includes(name) : true) && (enabled === undefined ? true : node.enabled === enabled)); return wantsPagedTree(input) ? pagedNodeList(session.planId, matches, input) : matches; }); }
+  private findNodes(input: ToolCallInput): ToolCallResult {
+    return this.withSession(input, (session) => {
+      const role = optionalString(input, "role") as SemanticRole | undefined;
+      const type = optionalString(input, "type");
+      const name = optionalString(input, "name");
+      const parentNodeId = optionalString(input, "parentNodeId");
+      const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined;
+      const match = findMatchMode(input);
+      const view = findViewMode(input);
+      const roots = scopedRoots(session.semanticPlan().root, optionalString(input, "subtreeNodeId") ?? optionalString(input, "nodeId"));
+      const matches = flattenSemanticNodes(roots).filter((node) =>
+        (role ? node.role === role : true) &&
+        (type ? textMatches(node.type, type, match) : true) &&
+        (name ? textMatches(node.name, name, match) : true) &&
+        (parentNodeId ? node.parentNodeId === parentNodeId : true) &&
+        (enabled === undefined ? true : node.enabled === enabled)
+      );
+      const data = matches.map((node) => formatFindNode(session.planId, node, view));
+      return wantsPagedFindNodes(input) ? pagedNodeList(session.planId, data, input) : data;
+    });
+  }
   private findByVariable(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).filter((node) => new Set(session.semanticPlan().indexes.variables[requiredString(input, "variable")] ?? []).has(node.nodeId))); }
   private findByRequest(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const method = optionalString(input, "method"); const pathContains = optionalString(input, "pathContains") ?? optionalString(input, "path"); const domainContains = optionalString(input, "domainContains") ?? optionalString(input, "domain"); return semanticNodes(session).filter((node) => { if (node.role !== "sampler") return false; const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`; return (method ? searchable.includes(method) : true) && (pathContains ? searchable.includes(pathContains) : true) && (domainContains ? searchable.includes(domainContains) : true); }); }); }
   private getPlanLanguage(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode; const format = optionalString(input, "format") ?? "object"; const document = projectPlanLanguage(session.semanticPlan(), { mode }); return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document; }); }
@@ -530,6 +552,23 @@ function compactTreeItem(planId: string, node: SemanticNode, depth: number): Tre
   };
 }
 
+function formatFindNode(planId: string, node: SemanticNode, view: FindViewMode): SemanticNode | TreeNodePageItem | Record<string, unknown> {
+  if (view === "compact") {
+    return compactTreeItem(planId, node, node.path.split("/").filter(Boolean).length - 1);
+  }
+  if (view === "raw") {
+    return {
+      nodeId: node.nodeId,
+      ...(node.parentNodeId ? { parentNodeId: node.parentNodeId } : {}),
+      rawRef: node.rawRef,
+      type: node.type,
+      name: node.name,
+      enabled: node.enabled
+    };
+  }
+  return node;
+}
+
 function scopedRoots(nodes: SemanticNode[], nodeId?: string): SemanticNode[] {
   if (!nodeId) {
     return nodes;
@@ -564,6 +603,63 @@ function pageByteBudget(input: ToolCallInput): number | undefined {
 
 function wantsPagedTree(input: ToolCallInput): boolean {
   return ["limit", "cursor", "depth", "byteBudget", "subtreeNodeId", "nodeId"].some((key) => key in input);
+}
+
+function wantsPagedFindNodes(input: ToolCallInput): boolean {
+  return wantsPagedTree(input) || "view" in input;
+}
+
+function findMatchMode(input: ToolCallInput): FindMatchMode {
+  const value = optionalString(input, "match");
+  return value === "exact" || value === "regex" || value === "fuzzy" ? value : "contains";
+}
+
+function findViewMode(input: ToolCallInput): FindViewMode {
+  const value = optionalString(input, "view");
+  return value === "compact" || value === "raw" ? value : "full";
+}
+
+function textMatches(value: string, pattern: string, mode: FindMatchMode): boolean {
+  switch (mode) {
+    case "exact":
+      return value === pattern;
+    case "regex":
+      return new RegExp(pattern).test(value);
+    case "fuzzy":
+      return fuzzyMatches(value, pattern);
+    case "contains":
+    default:
+      return value.includes(pattern);
+  }
+}
+
+function fuzzyMatches(value: string, pattern: string): boolean {
+  const needle = searchToken(pattern);
+  if (!needle) {
+    return true;
+  }
+  return searchTokens(value).some((candidate) => candidate.includes(needle) || levenshtein(candidate, needle) <= Math.max(2, Math.floor(needle.length * 0.35)));
+}
+
+function searchTokens(value: string): string[] {
+  const tokens = value.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return [tokens.join(""), ...tokens];
+}
+
+function searchToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function levenshtein(left: string, right: string): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 0; leftIndex < left.length; leftIndex += 1) {
+    const current = [leftIndex + 1];
+    for (let rightIndex = 0; rightIndex < right.length; rightIndex += 1) {
+      current.push(left[leftIndex] === right[rightIndex] ? previous[rightIndex] ?? 0 : Math.min(previous[rightIndex] ?? 0, previous[rightIndex + 1] ?? 0, current[rightIndex] ?? 0) + 1);
+    }
+    previous = current;
+  }
+  return previous[right.length] ?? left.length;
 }
 
 function nextSuggestedResources(planId: string): string[] {

@@ -392,6 +392,45 @@ describe("JmxplsRuntime", () => {
     expect((found.data as { nextSuggestedResources: string[] }).nextSuggestedResources[0]).toContain("cursor=2");
   });
 
+  it("finds nodes by match mode, subtree scope, and result view", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-find-nodes-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    const planId = (opened.data as { planId: string }).planId;
+
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = ((tree.data as Array<{ nodeId: string }>)[0]?.nodeId)!;
+    await runtime.callTool("add_node", { planId, parentNodeId: rootNodeId, nodeType: "ThreadGroup", fields: { name: "Checkout Users", enabled: true } });
+
+    const threadGroups = await runtime.callTool("find_nodes", { planId, role: "threadGroup" });
+    const checkoutId = (threadGroups.data as Array<{ name: string; nodeId: string }>).find((node) => node.name === "Checkout Users")?.nodeId;
+    expect(checkoutId).toBeDefined();
+    await runtime.callTool("add_http_request", { planId, parentNodeId: checkoutId, method: "GET", path: "/checkout" });
+
+    const exact = await runtime.callTool("find_nodes", { planId, name: "Checkout Users", match: "exact" });
+    expect((exact.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["Checkout Users"]);
+
+    const regex = await runtime.callTool("find_nodes", { planId, name: "^GET /check", match: "regex" });
+    expect((regex.data as Array<{ name: string }>).map((node) => node.name)).toEqual(["GET /checkout"]);
+
+    const fuzzy = await runtime.callTool("find_nodes", { planId, name: "chekout", match: "fuzzy" });
+    expect((fuzzy.data as Array<{ name: string }>).map((node) => node.name)).toContain("Checkout Users");
+
+    const compact = await runtime.callTool("find_nodes", { planId, role: "sampler", subtreeNodeId: checkoutId, view: "compact" });
+    const compactItems = (compact.data as { items: Array<{ name: string; fields?: unknown }> }).items;
+    expect(compactItems).toEqual([expect.objectContaining({ name: "GET /checkout" })]);
+    expect(compactItems[0]?.fields).toBeUndefined();
+
+    const full = await runtime.callTool("find_nodes", { planId, role: "sampler", subtreeNodeId: checkoutId, view: "full" });
+    expect((full.data as { items: Array<{ children?: unknown[]; fields: Record<string, unknown> }> }).items[0]).toEqual(expect.objectContaining({ fields: expect.any(Object), children: expect.any(Array) }));
+
+    const raw = await runtime.callTool("find_nodes", { planId, role: "sampler", subtreeNodeId: checkoutId, view: "raw" });
+    expect((raw.data as { items: Array<{ rawRef: string }> }).items[0]?.rawRef).toContain("jmxpls://raw/");
+  });
+
   it("preserves unknown plugin nodes through move and save", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-unknown-plugin-"));
     const planPath = join(dir, "unknown-plugin.jmx");
