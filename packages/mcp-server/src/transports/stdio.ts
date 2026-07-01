@@ -82,14 +82,14 @@ export class JsonRpcMcpSession {
     if (request.method === "initialize") {
       return this.state === "new" ? undefined : { code: INVALID_REQUEST, message: "Server is already initialized" };
     }
-    if (request.method === "shutdown") {
-      return this.state === "shutdown" ? { code: SERVER_SHUTTING_DOWN, message: "Server is shutting down" } : undefined;
-    }
     if (this.state === "shutdown") {
       return { code: SERVER_SHUTTING_DOWN, message: "Server is shutting down" };
     }
     if (this.state !== "ready") {
       return { code: SERVER_NOT_INITIALIZED, message: "Server is not initialized" };
+    }
+    if (request.method === "shutdown") {
+      return undefined;
     }
     return undefined;
   }
