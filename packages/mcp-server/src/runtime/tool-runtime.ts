@@ -1,6 +1,7 @@
 import {
   executionFlow,
   flattenSemanticNodes,
+  paginate,
   parsePlanLanguage,
   projectPlanLanguage,
   roundTripPlanLanguage,
@@ -55,8 +56,8 @@ export class JmxplsRuntime {
         case "reload_plan": return await this.reloadPlan(input);
         case "close_plan": return this.closePlan(input);
         case "list_open_plans": return { success: true, data: this.sessions.listOpenPlans() };
-        case "summarize_plan": return this.withSession(input, (session) => summarizePlan(session.semanticPlan()));
-        case "list_tree": return this.withSession(input, (session) => session.semanticPlan().root);
+        case "summarize_plan": return this.withSession(input, (session) => planSummaryResponse(session));
+        case "list_tree": return this.withSession(input, (session) => wantsPagedTree(input) ? treePageResponse(session, input) : session.semanticPlan().root);
         case "get_node": return this.getNode(input);
         case "find_nodes": return this.findNodes(input);
         case "find_by_variable": return this.findByVariable(input);
@@ -143,25 +144,29 @@ export class JmxplsRuntime {
   }
 
   readResource(uri: string): ToolCallResult {
-    const match = /^jmxpls:\/\/plans\/([^/]+)(?:\/(.*))?$/.exec(uri);
+    const { resourceUri, params } = parseResourceUri(uri);
+    const match = /^jmxpls:\/\/plans\/([^/]+)(?:\/(.*))?$/.exec(resourceUri);
     if (!match) return { success: false, error: `Unsupported resource URI: ${uri}` };
     const [, planId, suffix = "summary"] = match;
     const session = this.sessions.get(planId ?? "");
     if (!session) return { success: false, error: `Unknown planId: ${planId}` };
-    if (suffix === "summary") return { success: true, data: summarizePlan(session.semanticPlan()) };
-    if (suffix === "tree") return { success: true, data: session.semanticPlan().root };
+    if (suffix === "summary") return { success: true, data: planSummaryResponse(session) };
+    if (suffix === "tree") return { success: true, data: treePageResponse(session, params) };
     if (suffix === "execution-flow") return { success: true, data: executionFlow(session.semanticPlan()) };
     if (suffix.startsWith("plan-language")) return { success: true, data: projectPlanLanguage(session.semanticPlan(), { mode: (suffix.split("/")[1] as PlanLanguageMode | undefined) ?? "outline" }) };
+    const nodeMatch = /^node\/([^/]+)(?:\/children)?$/.exec(suffix);
+    if (nodeMatch && suffix.endsWith("/children")) return { success: true, data: nodeChildrenPageResponse(session, nodeMatch[1] ?? "", params) };
+    if (nodeMatch) return { success: true, data: semanticNodes(session).find((node) => node.nodeId === nodeMatch[1]) ?? null };
     if (suffix === "diagnostics") return { success: true, data: session.diagnostics };
     if (suffix === "diff/semantic") return { success: true, data: session.latestDiff ?? null };
     return { success: false, error: `Unsupported resource suffix: ${suffix}` };
   }
 
-  private async openPlan(input: ToolCallInput): Promise<ToolCallResult> { const session = await this.sessions.openPlan(requiredString(input, "path")); return { success: true, data: { ...session.summary(), summary: summarizePlan(session.semanticPlan()), defaultResource: `jmxpls://plans/${session.planId}/plan-language/outline` } }; }
+  private async openPlan(input: ToolCallInput): Promise<ToolCallResult> { const session = await this.sessions.openPlan(requiredString(input, "path")); return { success: true, data: { ...session.summary(), summary: planSummaryResponse(session), defaultResource: `jmxpls://plans/${session.planId}/plan-language/outline`, nextSuggestedResources: nextSuggestedResources(session.planId) } }; }
   private async reloadPlan(input: ToolCallInput): Promise<ToolCallResult> { const planId = requiredString(input, "planId"); const existing = this.sessions.get(planId); if (!existing) return { success: false, error: `Unknown planId: ${planId}` }; const sourcePath = existing.sourcePath; this.sessions.closePlan(planId); return this.openPlan({ path: sourcePath }); }
   private closePlan(input: ToolCallInput): ToolCallResult { const planId = requiredString(input, "planId"); return { success: this.sessions.closePlan(planId), data: { planId } }; }
   private getNode(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).find((node) => node.nodeId === requiredString(input, "nodeId")) ?? null); }
-  private findNodes(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const role = optionalString(input, "role") as SemanticRole | undefined; const type = optionalString(input, "type"); const name = optionalString(input, "name"); const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined; return semanticNodes(session).filter((node) => (role ? node.role === role : true) && (type ? node.type.includes(type) : true) && (name ? node.name.includes(name) : true) && (enabled === undefined ? true : node.enabled === enabled)); }); }
+  private findNodes(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const role = optionalString(input, "role") as SemanticRole | undefined; const type = optionalString(input, "type"); const name = optionalString(input, "name"); const enabled = typeof input.enabled === "boolean" ? input.enabled : undefined; const matches = semanticNodes(session).filter((node) => (role ? node.role === role : true) && (type ? node.type.includes(type) : true) && (name ? node.name.includes(name) : true) && (enabled === undefined ? true : node.enabled === enabled)); return wantsPagedTree(input) ? pagedNodeList(session.planId, matches, input) : matches; }); }
   private findByVariable(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => semanticNodes(session).filter((node) => new Set(session.semanticPlan().indexes.variables[requiredString(input, "variable")] ?? []).has(node.nodeId))); }
   private findByRequest(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const method = optionalString(input, "method"); const pathContains = optionalString(input, "pathContains") ?? optionalString(input, "path"); const domainContains = optionalString(input, "domainContains") ?? optionalString(input, "domain"); return semanticNodes(session).filter((node) => { if (node.role !== "sampler") return false; const searchable = `${node.name}\n${node.type}\n${JSON.stringify(node.fields)}`; return (method ? searchable.includes(method) : true) && (pathContains ? searchable.includes(pathContains) : true) && (domainContains ? searchable.includes(domainContains) : true); }); }); }
   private getPlanLanguage(input: ToolCallInput): ToolCallResult { return this.withSession(input, (session) => { const mode = (optionalString(input, "mode") ?? "outline") as PlanLanguageMode; const format = optionalString(input, "format") ?? "object"; const document = projectPlanLanguage(session.semanticPlan(), { mode }); return format === "json" || format === "yaml" ? serializePlanLanguage(document, format) : document; }); }
@@ -423,7 +428,131 @@ export class JmxplsRuntime {
   private withSession(input: ToolCallInput, fn: (session: PlanSession) => unknown): ToolCallResult { const session = this.sessions.get(requiredString(input, "planId")); if (!session) return { success: false, error: `Unknown planId: ${String(input.planId)}` }; return { success: true, data: fn(session) }; }
 }
 
+type TreeNodePageItem = {
+  nodeId: string;
+  parentNodeId?: string;
+  depth: number;
+  path: string;
+  role: SemanticRole;
+  type: string;
+  name: string;
+  enabled: boolean;
+  childCount: number;
+  hasChildren: boolean;
+  nextSuggestedResources: string[];
+};
+
 function semanticNodes(session: PlanSession): SemanticNode[] { return flattenSemanticNodes(session.semanticPlan().root); }
+function planSummaryResponse(session: PlanSession): Record<string, unknown> {
+  const summary = summarizePlan(session.semanticPlan());
+  const samplerLimit = 50;
+  const omittedSamplers = Math.max(0, summary.samplers.length - samplerLimit);
+  return {
+    ...summary,
+    samplerCount: summary.samplers.length,
+    samplers: summary.samplers.slice(0, samplerLimit),
+    omittedSamplers,
+    nextSuggestedResources: nextSuggestedResources(session.planId)
+  };
+}
+
+function treePageResponse(session: PlanSession, input: ToolCallInput): Record<string, unknown> {
+  const roots = scopedRoots(session.semanticPlan().root, optionalString(input, "subtreeNodeId") ?? optionalString(input, "nodeId"));
+  return pagedNodeList(session.planId, flattenTreePageItems(session.planId, roots, pageDepth(input)), input);
+}
+
+function nodeChildrenPageResponse(session: PlanSession, nodeId: string, input: ToolCallInput): Record<string, unknown> {
+  const node = semanticNodes(session).find((candidate) => candidate.nodeId === nodeId);
+  if (!node) {
+    return { items: [], total: 0, nextSuggestedResources: nextSuggestedResources(session.planId) };
+  }
+  return pagedNodeList(session.planId, flattenTreePageItems(session.planId, node.children, pageDepth(input)), input);
+}
+
+function pagedNodeList<T>(planId: string, items: T[], input: ToolCallInput): Record<string, unknown> {
+  const limit = pageLimit(input);
+  const page = paginate(items, limit, optionalString(input, "cursor"));
+  return {
+    items: page.items,
+    limit,
+    total: items.length,
+    ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
+    nextSuggestedResources: page.nextCursor ? [`jmxpls://plans/${planId}/tree?cursor=${page.nextCursor}&limit=${limit}`] : nextSuggestedResources(planId)
+  };
+}
+
+function flattenTreePageItems(planId: string, nodes: SemanticNode[], maxDepth: number, depth = 0): TreeNodePageItem[] {
+  if (depth > maxDepth) {
+    return [];
+  }
+  return nodes.flatMap((node) => [
+    compactTreeItem(planId, node, depth),
+    ...flattenTreePageItems(planId, node.children, maxDepth, depth + 1)
+  ]);
+}
+
+function compactTreeItem(planId: string, node: SemanticNode, depth: number): TreeNodePageItem {
+  return {
+    nodeId: node.nodeId,
+    ...(node.parentNodeId ? { parentNodeId: node.parentNodeId } : {}),
+    depth,
+    path: node.path,
+    role: node.role,
+    type: node.type,
+    name: node.name,
+    enabled: node.enabled,
+    childCount: node.children.length,
+    hasChildren: node.children.length > 0,
+    nextSuggestedResources: [`jmxpls://plans/${planId}/node/${node.nodeId}`, `jmxpls://plans/${planId}/node/${node.nodeId}/children?limit=50`]
+  };
+}
+
+function scopedRoots(nodes: SemanticNode[], nodeId?: string): SemanticNode[] {
+  if (!nodeId) {
+    return nodes;
+  }
+  const node = flattenSemanticNodes(nodes).find((candidate) => candidate.nodeId === nodeId);
+  return node ? [node] : [];
+}
+
+function pageLimit(input: ToolCallInput): number {
+  const value = optionalInteger(input, "limit");
+  if (value === undefined) {
+    return 50;
+  }
+  return Math.min(Math.max(value, 1), 200);
+}
+
+function pageDepth(input: ToolCallInput): number {
+  const value = optionalInteger(input, "depth");
+  if (value === undefined) {
+    return 2;
+  }
+  return Math.min(Math.max(value, 0), 20);
+}
+
+function wantsPagedTree(input: ToolCallInput): boolean {
+  return ["limit", "cursor", "depth", "subtreeNodeId", "nodeId"].some((key) => key in input);
+}
+
+function nextSuggestedResources(planId: string): string[] {
+  return [
+    `jmxpls://plans/${planId}/plan-language/outline`,
+    `jmxpls://plans/${planId}/tree?limit=50&depth=2`,
+    `jmxpls://plans/${planId}/diagnostics`
+  ];
+}
+
+function parseResourceUri(uri: string): { resourceUri: string; params: ToolCallInput } {
+  const [resourceUri = "", query = ""] = uri.split("?", 2);
+  const params: ToolCallInput = {};
+  for (const [key, value] of new URLSearchParams(query)) {
+    const numeric = Number(value);
+    params[key] = Number.isInteger(numeric) && value.trim() !== "" ? numeric : value;
+  }
+  return { resourceUri, params };
+}
+
 function semanticPatchFromInput(input: ToolCallInput): SemanticPatch { const patch = input.patch as SemanticPatch | undefined; if (patch && Array.isArray(patch.operations)) return patch; if (Array.isArray(input.operations)) return patchWithFlags(input, input.operations as SemanticPatchOperation[]); throw new Error("patch.operations is required"); }
 function patchWithFlags(input: ToolCallInput, operations: SemanticPatchOperation[]): SemanticPatch { return { operations, ...(typeof input.dryRun === "boolean" ? { dryRun: input.dryRun } : {}), ...(typeof input.validate === "boolean" ? { validate: input.validate } : {}) }; }
 function typedAddOperation(input: ToolCallInput, nodeType: string, guiClass: string, fields: Record<string, unknown>): SemanticPatchOperation { const parentNodeId = optionalString(input, "parentNodeId") ?? optionalString(input, "parentId") ?? requiredString(input, "parentNodeId"); const index = optionalNumber(input, "index"); return { op: "addNode", parentNodeId, nodeType, fields: { ...fields, guiClass }, ...(index !== undefined ? { index } : {}) }; }
@@ -480,6 +609,12 @@ function defaultSaveConfig(): Record<string, boolean> { return { time: true, lat
 function requiredString(input: ToolCallInput, key: string): string { const value = input[key]; if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is required`); return value; }
 function optionalString(input: ToolCallInput, key: string): string | undefined { const value = input[key]; return typeof value === "string" && value.length > 0 ? value : undefined; }
 function optionalNumber(input: ToolCallInput, key: string): number | undefined { const value = input[key]; return typeof value === "number" && Number.isInteger(value) ? value : undefined; }
+function optionalInteger(input: ToolCallInput, key: string): number | undefined {
+  const value = input[key];
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && /^-?\d+$/.test(value)) return Number(value);
+  return undefined;
+}
 function optionalBoolean(input: ToolCallInput, key: string): boolean | undefined { const value = input[key]; return typeof value === "boolean" ? value : undefined; }
 function optionalScalar(input: ToolCallInput, key: string): string | number | undefined { const value = input[key]; return typeof value === "string" || typeof value === "number" ? value : undefined; }
 function objectInput(input: ToolCallInput, key: string): Record<string, unknown> | undefined { const value = input[key]; return isObject(value) ? value : undefined; }

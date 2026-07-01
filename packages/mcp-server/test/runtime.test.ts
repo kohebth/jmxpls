@@ -336,6 +336,52 @@ describe("JmxplsRuntime", () => {
     expect((controllers.data as Array<{ name: string; nodeId: string }>)[0]?.name).toBe("added");
   });
 
+  it("paginates large tree views and returns suggested next resources", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmxpls-large-tree-"));
+    const planPath = join(dir, "minimal.jmx");
+    copyFileSync(resolve(root, "fixtures/jmx/minimal.jmx"), planPath);
+
+    const runtime = new JmxplsRuntime();
+    const opened = await runtime.callTool("open_plan", { path: planPath });
+    expect(opened.success).toBe(true);
+    const planId = (opened.data as { planId: string }).planId;
+    expect((opened.data as { nextSuggestedResources: string[] }).nextSuggestedResources).toContain(`jmxpls://plans/${planId}/tree?limit=50&depth=2`);
+
+    const tree = await runtime.callTool("list_tree", { planId });
+    const rootNodeId = (tree.data as Array<{ nodeId: string }>)[0]?.nodeId;
+    expect(rootNodeId).toBeTruthy();
+
+    const seeded = await runtime.callTool("apply_semantic_patch", {
+      planId,
+      operations: Array.from({ length: 6 }, (_, index) => ({
+        op: "addNode",
+        parentNodeId: rootNodeId,
+        nodeType: "ThreadGroup",
+        fields: { name: `users-${index}`, enabled: true, "ThreadGroup.num_threads": 1 }
+      }))
+    });
+    expect(seeded.success).toBe(true);
+
+    const firstPage = await runtime.callTool("list_tree", { planId, limit: 3, depth: 1 });
+    expect(firstPage.success).toBe(true);
+    expect((firstPage.data as { items: unknown[] }).items).toHaveLength(3);
+    expect((firstPage.data as { total: number }).total).toBe(7);
+    expect((firstPage.data as { nextCursor: string }).nextCursor).toBe("3");
+
+    const secondPage = runtime.readResource(`jmxpls://plans/${planId}/tree?limit=3&cursor=3&depth=1`);
+    expect(secondPage.success).toBe(true);
+    expect((secondPage.data as { items: unknown[] }).items).toHaveLength(3);
+
+    const children = runtime.readResource(`jmxpls://plans/${planId}/node/${rootNodeId}/children?limit=2`);
+    expect(children.success).toBe(true);
+    expect((children.data as { items: unknown[]; nextCursor: string }).items).toHaveLength(2);
+    expect((children.data as { nextCursor: string }).nextCursor).toBe("2");
+
+    const found = await runtime.callTool("find_nodes", { planId, role: "threadGroup", limit: 2 });
+    expect((found.data as { items: unknown[]; nextCursor: string }).items).toHaveLength(2);
+    expect((found.data as { nextSuggestedResources: string[] }).nextSuggestedResources[0]).toContain("cursor=2");
+  });
+
   it("supports dry-run plan-language application without mutating sessions", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-apply-plan-language-dry-run-"));
     const planPath = join(dir, "minimal.jmx");

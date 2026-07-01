@@ -25,16 +25,17 @@ const TYPED_ADD_BASE = { ...PLAN_ID, ...PARENT_ID, name: NON_EMPTY_STRING, ...PO
 const HTTP_TARGET_FIELDS = { name: NON_EMPTY_STRING, protocol: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, port: STRING_OR_NUMBER, path: NON_EMPTY_STRING };
 const PLAN_LANGUAGE_OPTIONS = { mode: { type: "string", enum: ["outline", "flow", "semantic", "full"] }, format: { type: "string", enum: ["object", "json", "yaml"] } };
 const PLAN_LANGUAGE_APPLY_OPTIONS = { mode: { type: "string", enum: ["replace", "merge", "patch"] }, dryRun: BOOLEAN, validate: BOOLEAN };
+const PAGE_OPTIONS = { limit: INTEGER, cursor: NON_EMPTY_STRING, depth: INTEGER, subtreeNodeId: NON_EMPTY_STRING };
 const SOURCE_TEXT_OR_PATH = { text: NON_EMPTY_STRING, path: NON_EMPTY_STRING };
 const EXTRACTOR_BASE = { ...TYPED_ADD_BASE, variableName: NON_EMPTY_STRING, defaultValue: NON_EMPTY_STRING, matchNumber: STRING_OR_NUMBER };
 const JSR223_FIELDS = { language: NON_EMPTY_STRING, script: NON_EMPTY_STRING, filename: NON_EMPTY_STRING, parameters: NON_EMPTY_STRING, cacheKey: NON_EMPTY_STRING };
 
 export const SESSION_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
-  open_plan: objectSchema({ path: NON_EMPTY_STRING }, ["path"]), close_plan: objectSchema(PLAN_ID, ["planId"]), reload_plan: objectSchema(PLAN_ID, ["planId"]), save_plan: objectSchema({ ...PLAN_ID, path: NON_EMPTY_STRING, backup: BOOLEAN }, ["planId"]), save_plan_as: objectSchema({ ...PLAN_ID, path: NON_EMPTY_STRING, backup: BOOLEAN }, ["planId", "path"]), list_open_plans: objectSchema({}), summarize_plan: objectSchema(PLAN_ID, ["planId"]), list_tree: objectSchema(PLAN_ID, ["planId"]), get_node: objectSchema({ ...PLAN_ID, ...NODE_ID }, ["planId", "nodeId"])
+  open_plan: objectSchema({ path: NON_EMPTY_STRING }, ["path"]), close_plan: objectSchema(PLAN_ID, ["planId"]), reload_plan: objectSchema(PLAN_ID, ["planId"]), save_plan: objectSchema({ ...PLAN_ID, path: NON_EMPTY_STRING, backup: BOOLEAN }, ["planId"]), save_plan_as: objectSchema({ ...PLAN_ID, path: NON_EMPTY_STRING, backup: BOOLEAN }, ["planId", "path"]), list_open_plans: objectSchema({}), summarize_plan: objectSchema(PLAN_ID, ["planId"]), list_tree: objectSchema({ ...PLAN_ID, ...PAGE_OPTIONS, nodeId: NON_EMPTY_STRING }, ["planId"]), get_node: objectSchema({ ...PLAN_ID, ...NODE_ID }, ["planId", "nodeId"])
 };
 
 export const QUERY_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {
-  find_nodes: objectSchema({ ...PLAN_ID, role: NON_EMPTY_STRING, type: NON_EMPTY_STRING, name: NON_EMPTY_STRING, enabled: BOOLEAN }, ["planId"]), find_by_variable: objectSchema({ ...PLAN_ID, variable: NON_EMPTY_STRING }, ["planId", "variable"]), find_by_request: objectSchema({ ...PLAN_ID, method: NON_EMPTY_STRING, path: NON_EMPTY_STRING, pathContains: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, domainContains: NON_EMPTY_STRING }, ["planId"]), find_disabled_nodes: objectSchema(PLAN_ID, ["planId"]), explain_execution_flow: objectSchema(PLAN_ID, ["planId"])
+  find_nodes: objectSchema({ ...PLAN_ID, role: NON_EMPTY_STRING, type: NON_EMPTY_STRING, name: NON_EMPTY_STRING, enabled: BOOLEAN, ...PAGE_OPTIONS, nodeId: NON_EMPTY_STRING }, ["planId"]), find_by_variable: objectSchema({ ...PLAN_ID, variable: NON_EMPTY_STRING }, ["planId", "variable"]), find_by_request: objectSchema({ ...PLAN_ID, method: NON_EMPTY_STRING, path: NON_EMPTY_STRING, pathContains: NON_EMPTY_STRING, domain: NON_EMPTY_STRING, domainContains: NON_EMPTY_STRING }, ["planId"]), find_disabled_nodes: objectSchema(PLAN_ID, ["planId"]), explain_execution_flow: objectSchema(PLAN_ID, ["planId"])
 };
 
 export const PLAN_LANGUAGE_TOOL_INPUT_SCHEMAS: Record<string, JsonSchema> = {

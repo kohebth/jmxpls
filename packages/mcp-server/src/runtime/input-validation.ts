@@ -29,6 +29,7 @@ const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
   { name: "mode", type: "string", enum: ["replace", "merge", "patch"] },
   ...PATCH_OPTIONALS
 ];
+const PAGE_OPTIONALS: FieldRule[] = [{ name: "limit", type: "integer" }, { name: "cursor", type: "string" }, { name: "depth", type: "integer" }, { name: "subtreeNodeId", type: "string" }, { name: "nodeId", type: "string" }];
 const POSITION_OPTIONALS: FieldRule[] = [{ name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS];
 const PARENT_OPTIONALS: FieldRule[] = PARENT_ID_ALIASES;
 const HTTP_TARGET_OPTIONALS: FieldRule[] = [
@@ -49,9 +50,9 @@ const TOOL_INPUT_RULES: Record<string, ToolInputRule> = {
   close_plan: { required: [PLAN_ID] },
   list_open_plans: {},
   summarize_plan: { required: [PLAN_ID] },
-  list_tree: { required: [PLAN_ID] },
+  list_tree: { required: [PLAN_ID], optional: PAGE_OPTIONALS },
   get_node: { required: [PLAN_ID, NODE_ID] },
-  find_nodes: { required: [PLAN_ID], optional: [{ name: "role", type: "string" }, { name: "type", type: "string" }, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }] },
+  find_nodes: { required: [PLAN_ID], optional: [{ name: "role", type: "string" }, { name: "type", type: "string" }, { name: "name", type: "string" }, { name: "enabled", type: "boolean" }, ...PAGE_OPTIONALS] },
   find_by_variable: { required: [PLAN_ID, { name: "variable", type: "string" }] },
   find_by_request: { required: [PLAN_ID], optional: [{ name: "method", type: "string" }, { name: "path", type: "string" }, { name: "pathContains", type: "string" }, { name: "domain", type: "string" }, { name: "domainContains", type: "string" }] },
   find_disabled_nodes: { required: [PLAN_ID] },
