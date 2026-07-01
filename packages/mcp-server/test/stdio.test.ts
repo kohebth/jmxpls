@@ -205,24 +205,27 @@ describe("stdio JSON-RPC MCP transport", () => {
     });
   });
 
-  it("handles JSON-RPC batch requests and omits notification responses", async () => {
-    const response = await handleJsonRpcMessage(JSON.stringify([
+  it("rejects JSON-RPC batch arrays because MCP stdio messages are individual messages", async () => {
+    await expect(handleJsonRpcMessage(JSON.stringify([
       { jsonrpc: "2.0", id: "ping", method: "ping" },
       { jsonrpc: "2.0", method: "notifications/initialized" },
       { jsonrpc: "2.0", id: "tools", method: "tools/list" }
-    ]), server, runtime);
-
-    expect(response).toEqual([
-      { jsonrpc: "2.0", id: "ping", result: {} },
-      { jsonrpc: "2.0", id: "tools", result: expect.objectContaining({ tools: expect.any(Array) }) }
-    ]);
+    ]), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "Invalid Request" }
+    });
   });
 
-  it("returns no batch response when every item is a notification", async () => {
+  it("rejects notification-only JSON-RPC batch arrays", async () => {
     await expect(handleJsonRpcMessage(JSON.stringify([
       { jsonrpc: "2.0", method: "notifications/initialized" },
       { jsonrpc: "2.0", method: "notifications/progress" }
-    ]), server, runtime)).resolves.toBeUndefined();
+    ]), server, runtime)).resolves.toEqual({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "Invalid Request" }
+    });
   });
 
   it("accepts JSON-RPC response messages without replying", async () => {
@@ -232,15 +235,17 @@ describe("stdio JSON-RPC MCP transport", () => {
       result: {}
     }), server, runtime)).resolves.toBeUndefined();
 
-    const response = await handleJsonRpcMessage(JSON.stringify([
-      { jsonrpc: "2.0", id: "server-request", result: {} },
-      { jsonrpc: "2.0", id: "ping", method: "ping" },
-      { jsonrpc: "2.0", id: "server-error", error: { code: -32603, message: "client-side failure" } }
-    ]), server, runtime);
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "server-error",
+      error: { code: -32603, message: "client-side failure" }
+    }), server, runtime)).resolves.toBeUndefined();
 
-    expect(response).toEqual([
-      { jsonrpc: "2.0", id: "ping", result: {} }
-    ]);
+    await expect(handleJsonRpcMessage(JSON.stringify({
+      jsonrpc: "2.0",
+      id: "ping",
+      method: "ping"
+    }), server, runtime)).resolves.toEqual({ jsonrpc: "2.0", id: "ping", result: {} });
   });
 
   it("rejects MCP response messages with null ids", async () => {

@@ -111,15 +111,7 @@ async function handleJsonRpcMessageWithState(line: string, server: ServerLike, r
   }
 
   if (Array.isArray(parsed)) {
-    if (parsed.length === 0) {
-      return errorResponse(null, INVALID_REQUEST, "Invalid Request");
-    }
-    const responses: JsonRpcResponse[] = [];
-    for (const item of parsed) {
-      const response = await handleJsonRpcValue(item, server, runtime, session);
-      if (response) responses.push(response);
-    }
-    return responses.length > 0 ? responses : undefined;
+    return errorResponse(null, INVALID_REQUEST, "Invalid Request");
   }
 
   return handleJsonRpcValue(parsed, server, runtime, session);
