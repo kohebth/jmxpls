@@ -39,6 +39,10 @@ describe("security helpers", () => {
     const run = await runtime.callTool("run_jmeter", { planPath: join(outside, "plan.jmx"), jtlPath: join(workspace, "out.jtl") });
     expect(run.success).toBe(false);
     expect(run.error).toContain("outside configured workspace roots");
+
+    const unsafeExecutable = await runtime.callTool("run_jmeter", { planPath: join(workspace, "plan.jmx"), jtlPath: join(workspace, "out.jtl"), jmeterExecutable: "/bin/sh" });
+    expect(unsafeExecutable.success).toBe(false);
+    expect(unsafeExecutable.error).toContain("Rejected unsafe JMeter executable");
   });
 
   it("records mutation and run audit entries", async () => {

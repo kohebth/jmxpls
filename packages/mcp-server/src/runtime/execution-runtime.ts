@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { basename } from "node:path";
 
 import {
   BridgeClient,
@@ -427,11 +428,18 @@ function generateRawTemplate(input: ToolCallInput): ToolCallResult {
 }
 
 function assertAllowedCommand(command: JMeterCommand): void {
-  for (const arg of [command.executable, ...command.args]) {
+  if (!isAllowedJMeterExecutableName(command.executable)) {
+    throw new Error(`Rejected unsafe JMeter executable: ${command.executable}`);
+  }
+  for (const arg of command.args) {
     if (!isAllowedJMeterArg(arg)) {
       throw new Error(`Rejected unsafe JMeter argument: ${arg}`);
     }
   }
+}
+
+function isAllowedJMeterExecutableName(executable: string): boolean {
+  return isAllowedJMeterArg(executable) && ["jmeter", "jmeter.bat", "ApacheJMeter.jar"].includes(basename(executable));
 }
 
 function requiredPath(input: ToolCallInput, aliases: string[]): string {

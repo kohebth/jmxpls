@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { atomicWriteFile, backupFile, buildJMeterCliCommand, checkSla, compareJtlMetrics, computeJtlMetrics, createBuiltInTemplateRegistry, parseJtlCsv, renderMetricsReport } from "../src/index.js";
+import { atomicWriteFile, backupFile, buildJMeterCliCommand, checkSla, compareJtlMetrics, computeJtlMetrics, createBuiltInTemplateRegistry, isAllowedJMeterExecutable, parseJtlCsv, renderMetricsReport } from "../src/index.js";
 
 const loadProfileTimers = {
   constant_load_profile: "ConstantTimer",
@@ -17,6 +17,8 @@ const loadProfileTimers = {
 describe("runs, IO, and templates", () => {
   it("builds allowlisted JMeter commands", () => {
     expect(buildJMeterCliCommand("plan.jmx", "out.jtl").args).toEqual(["-n", "-t", "plan.jmx", "-l", "out.jtl"]);
+    expect(isAllowedJMeterExecutable("/opt/jmeter/bin/jmeter")).toBe(true);
+    expect(isAllowedJMeterExecutable("/bin/sh")).toBe(false);
   });
 
   it("parses JTL and computes metrics", () => {

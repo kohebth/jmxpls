@@ -1,3 +1,5 @@
+import { basename } from "node:path";
+
 export type JMeterCommand = {
   executable: string;
   args: string[];
@@ -8,5 +10,9 @@ export function buildJMeterCliCommand(planPath: string, jtlPath: string, jmeterE
 }
 
 export function isAllowedJMeterArg(arg: string): boolean {
-  return !arg.includes(";") && !arg.includes("&&") && !arg.includes("||");
+  return !/[;\n\r]/.test(arg) && !arg.includes("&&") && !arg.includes("||");
+}
+
+export function isAllowedJMeterExecutable(executable: string): boolean {
+  return isAllowedJMeterArg(executable) && ["jmeter", "jmeter.bat", "ApacheJMeter.jar"].includes(basename(executable));
 }
