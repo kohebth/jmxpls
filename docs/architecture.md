@@ -16,7 +16,7 @@ Resources are read-only views over runtime state. Plan resources expose summarie
 
 ## Identity Sidecars
 
-JMX does not carry stable node IDs. On save, `jmxpls` writes `<plan>.jmxpls.meta.json` with current stable node IDs, JMX paths, fingerprints, and names. On open, matching sidecar fingerprints are reapplied to the canonical tree so semantic resources, diffs, and patches can keep stable IDs across reloads while the `.jmx` remains valid without the sidecar.
+JMX does not carry stable node IDs. On save, `jmxpls` writes `<plan>.jmxpls.meta.json` next to the plan, for example `load.jmx` produces `load.jmxpls.meta.json`, with current stable node IDs, JMX paths, fingerprints, and names. On open, matching sidecar fingerprints are reapplied to the canonical tree so semantic resources, diffs, and patches can keep stable IDs across reloads while the `.jmx` remains valid without the sidecar.
 
 ## Execution Boundary
 

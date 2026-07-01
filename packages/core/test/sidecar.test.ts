@@ -4,11 +4,15 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { flattenSemanticNodes, loadSidecar, reconcileSidecar, saveSidecar, SessionManager } from "../src/index.js";
+import { flattenSemanticNodes, loadSidecar, reconcileSidecar, saveSidecar, SessionManager, sidecarPathFor } from "../src/index.js";
 
 const root = resolve(import.meta.dirname, "../../..");
 
 describe("sidecar store", () => {
+  it("uses jmxpls sidecar filenames next to JMX files", () => {
+    expect(sidecarPathFor("/plans/load.jmx")).toBe("/plans/load.jmxpls.meta.json");
+  });
+
   it("loads missing sidecars without diagnostics", async () => {
     const result = await loadSidecar("/tmp/does-not-exist.jmx");
 
@@ -29,7 +33,7 @@ describe("sidecar store", () => {
   it("warns on corrupt sidecars", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jmxpls-"));
     const planPath = join(dir, "plan.jmx");
-    writeFileSync(`${planPath}.jmxpls.meta.json`, "not json");
+    writeFileSync(sidecarPathFor(planPath), "not json");
 
     const result = await loadSidecar(planPath);
 
@@ -70,7 +74,7 @@ describe("sidecar store", () => {
     });
 
     const saved = await session.save(planPath, false);
-    expect(saved.sidecarPath).toBe(`${planPath}.jmxpls.meta.json`);
+    expect(saved.sidecarPath).toBe(sidecarPathFor(planPath));
 
     const reopened = await new SessionManager().openPlan(planPath);
     const nodeIds = flattenSemanticNodes(reopened.semanticPlan().root).map((node) => node.nodeId);

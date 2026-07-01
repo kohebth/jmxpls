@@ -1,10 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { extname } from "node:path";
 
 import type { Diagnostic } from "../model/diagnostics.js";
 import type { SidecarDocument, SidecarLoadResult, SidecarNodeIdentity } from "../model/sidecar.js";
 
 export function sidecarPathFor(jmxPath: string): string {
-  return `${jmxPath}.jmxpls.meta.json`;
+  return `${jmxPath.slice(0, jmxPath.length - extname(jmxPath).length)}.jmxpls.meta.json`;
 }
 
 export async function loadSidecar(jmxPath: string): Promise<SidecarLoadResult> {
