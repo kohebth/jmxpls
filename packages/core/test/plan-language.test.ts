@@ -19,6 +19,12 @@ describe("Plan Language", () => {
     expect(projectPlanLanguage(plan, { mode: "full" }).nodes[0]?.rawRef).toBeTruthy();
   });
 
+  it("limits projected node depth", () => {
+    const document = projectPlanLanguage(semanticPlan(), { depth: 0 });
+
+    expect(document.nodes[0]?.children).toBeUndefined();
+  });
+
   it("serializes and parses JSON", () => {
     const document = projectPlanLanguage(semanticPlan(), { mode: "semantic" });
     const parsed = parsePlanLanguage(serializePlanLanguage(document, "json"));

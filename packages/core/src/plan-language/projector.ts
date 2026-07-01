@@ -40,7 +40,7 @@ function nodesForMode(
   return nodes.map((node) => projectNode(node, options));
 }
 
-function projectNode(node: SemanticNode, options: PlanLanguageProjectionOptions): PlanLanguageNode {
+function projectNode(node: SemanticNode, options: PlanLanguageProjectionOptions, depth = 0): PlanLanguageNode {
   const mode = options.mode ?? "outline";
   const detail = options.detail ?? "compact";
   const projected: PlanLanguageNode = {
@@ -51,8 +51,8 @@ function projectNode(node: SemanticNode, options: PlanLanguageProjectionOptions)
     enabled: node.enabled
   };
 
-  if (node.children.length > 0) {
-    projected.children = node.children.map((child) => projectNode(child, options));
+  if (node.children.length > 0 && (options.depth === undefined || depth < options.depth)) {
+    projected.children = node.children.map((child) => projectNode(child, options, depth + 1));
   }
 
   if (mode === "semantic" || mode === "full" || detail !== "compact") {

@@ -30,6 +30,7 @@ export type PlanLanguageProjectionOptions = {
   detail?: PlanLanguageDetail;
   redaction?: RedactionMode;
   subtreeNodeId?: string;
+  depth?: number;
 };
 
 export type PlanLanguageParseResult = {

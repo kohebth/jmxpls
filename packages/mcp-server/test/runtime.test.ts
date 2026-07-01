@@ -194,6 +194,9 @@ describe("JmxplsRuntime", () => {
 
     const unredacted = await runtime.callTool("get_plan_language", { planId, mode: "semantic", nodeId: scopedNodeId, redaction: "none" });
     expect((unredacted.data as { nodes: Array<{ fields: Record<string, unknown> }> }).nodes[0]?.fields.password).toBe("secret-value");
+
+    const depthZero = await runtime.callTool("get_plan_language", { planId, depth: 0 });
+    expect((depthZero.data as { nodes: Array<{ children?: unknown[] }> }).nodes[0]?.children).toBeUndefined();
   });
 
   it("imports Plan Language text into a new target plan", async () => {

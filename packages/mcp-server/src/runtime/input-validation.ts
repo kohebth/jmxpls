@@ -31,6 +31,7 @@ const PLAN_LANGUAGE_PROJECTION_OPTIONALS: FieldRule[] = [
   { name: "redaction", type: "string", enum: ["none", "standard", "strict"] },
   { name: "subtreeNodeId", type: "string" },
   { name: "nodeId", type: "string" },
+  { name: "depth", type: "integer" },
   { name: "format", type: "string", enum: ["object", "json", "yaml"] }
 ];
 const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
