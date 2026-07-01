@@ -368,6 +368,16 @@ describe("JmxplsRuntime", () => {
     expect((firstPage.data as { total: number }).total).toBe(7);
     expect((firstPage.data as { nextCursor: string }).nextCursor).toBe("3");
 
+    const budgeted = await runtime.callTool("list_tree", { planId, limit: 7, depth: 1, byteBudget: 600 });
+    expect(budgeted.success).toBe(true);
+    expect((budgeted.data as { items: unknown[] }).items.length).toBeLessThan(7);
+    expect((budgeted.data as { truncatedByBudget: boolean }).truncatedByBudget).toBe(true);
+    expect((budgeted.data as { nextCursor: string }).nextCursor).toBeTruthy();
+
+    const subtree = await runtime.callTool("list_tree", { planId, subtreeNodeId: rootNodeId, depth: 0 });
+    expect((subtree.data as { items: Array<{ nodeId: string }>; total: number }).items).toEqual([{ nodeId: rootNodeId, depth: 0, path: expect.any(String), role: "testPlan", type: "TestPlan", name: "Minimal Plan", enabled: true, childCount: 6, hasChildren: true, nextSuggestedResources: expect.any(Array) }]);
+    expect((subtree.data as { total: number }).total).toBe(1);
+
     const secondPage = runtime.readResource(`jmxpls://plans/${planId}/tree?limit=3&cursor=3&depth=1`);
     expect(secondPage.success).toBe(true);
     expect((secondPage.data as { items: unknown[] }).items).toHaveLength(3);

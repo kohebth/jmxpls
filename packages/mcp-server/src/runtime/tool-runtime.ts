@@ -1,7 +1,6 @@
 import {
   executionFlow,
   flattenSemanticNodes,
-  paginate,
   parsePlanLanguage,
   projectPlanLanguage,
   roundTripPlanLanguage,
@@ -471,13 +470,37 @@ function nodeChildrenPageResponse(session: PlanSession, nodeId: string, input: T
 
 function pagedNodeList<T>(planId: string, items: T[], input: ToolCallInput): Record<string, unknown> {
   const limit = pageLimit(input);
-  const page = paginate(items, limit, optionalString(input, "cursor"));
+  const page = boundedPage(items, limit, optionalString(input, "cursor"), pageByteBudget(input));
   return {
     items: page.items,
     limit,
     total: items.length,
+    ...(page.byteBudget ? { byteBudget: page.byteBudget } : {}),
+    ...(page.truncatedByBudget ? { truncatedByBudget: true } : {}),
     ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
     nextSuggestedResources: page.nextCursor ? [`jmxpls://plans/${planId}/tree?cursor=${page.nextCursor}&limit=${limit}`] : nextSuggestedResources(planId)
+  };
+}
+
+function boundedPage<T>(items: T[], limit: number, cursor?: string, byteBudget?: number): { items: T[]; nextCursor?: string; byteBudget?: number; truncatedByBudget?: boolean } {
+  const start = cursor ? Number(cursor) : 0;
+  const selected = items.slice(start, start + limit);
+  const next = start + selected.length;
+  if (!byteBudget) {
+    return { items: selected, ...(next < items.length ? { nextCursor: String(next) } : {}) };
+  }
+
+  let pageItems = selected;
+  while (pageItems.length > 1 && Buffer.byteLength(JSON.stringify(pageItems), "utf8") > byteBudget) {
+    pageItems = pageItems.slice(0, -1);
+  }
+
+  const budgetNext = start + pageItems.length;
+  return {
+    items: pageItems,
+    byteBudget,
+    ...(pageItems.length < selected.length ? { truncatedByBudget: true } : {}),
+    ...(budgetNext < items.length ? { nextCursor: String(budgetNext) } : {})
   };
 }
 
@@ -531,8 +554,16 @@ function pageDepth(input: ToolCallInput): number {
   return Math.min(Math.max(value, 0), 20);
 }
 
+function pageByteBudget(input: ToolCallInput): number | undefined {
+  const value = optionalInteger(input, "byteBudget");
+  if (value === undefined) {
+    return undefined;
+  }
+  return Math.min(Math.max(value, 256), 1024 * 1024);
+}
+
 function wantsPagedTree(input: ToolCallInput): boolean {
-  return ["limit", "cursor", "depth", "subtreeNodeId", "nodeId"].some((key) => key in input);
+  return ["limit", "cursor", "depth", "byteBudget", "subtreeNodeId", "nodeId"].some((key) => key in input);
 }
 
 function nextSuggestedResources(planId: string): string[] {

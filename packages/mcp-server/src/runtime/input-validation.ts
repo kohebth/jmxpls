@@ -29,7 +29,7 @@ const PLAN_LANGUAGE_APPLY_OPTIONALS: FieldRule[] = [
   { name: "mode", type: "string", enum: ["replace", "merge", "patch"] },
   ...PATCH_OPTIONALS
 ];
-const PAGE_OPTIONALS: FieldRule[] = [{ name: "limit", type: "integer" }, { name: "cursor", type: "string" }, { name: "depth", type: "integer" }, { name: "subtreeNodeId", type: "string" }, { name: "nodeId", type: "string" }];
+const PAGE_OPTIONALS: FieldRule[] = [{ name: "limit", type: "integer" }, { name: "cursor", type: "string" }, { name: "depth", type: "integer" }, { name: "byteBudget", type: "integer" }, { name: "subtreeNodeId", type: "string" }, { name: "nodeId", type: "string" }];
 const POSITION_OPTIONALS: FieldRule[] = [{ name: "enabled", type: "boolean" }, { name: "index", type: "integer" }, ...PATCH_OPTIONALS];
 const PARENT_OPTIONALS: FieldRule[] = PARENT_ID_ALIASES;
 const HTTP_TARGET_OPTIONALS: FieldRule[] = [
