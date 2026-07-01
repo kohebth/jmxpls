@@ -43,9 +43,10 @@ export function runStdioServer(): void {
   const runtime = new JmxplsRuntime();
   const session = new JsonRpcMcpSession(server, runtime);
   const lines = createInterface({ input: process.stdin, output: process.stdout, terminal: false });
+  let chain = Promise.resolve();
 
   lines.on("line", (line) => {
-    void (async () => {
+    chain = chain.then(async () => {
       await handleLine(line, session, (response) => {
         process.stdout.write(`${JSON.stringify(response)}\n`);
       });
@@ -53,7 +54,7 @@ export function runStdioServer(): void {
         lines.close();
         process.stdin.pause();
       }
-    })();
+    });
   });
 }
 
