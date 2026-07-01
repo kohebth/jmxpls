@@ -16,7 +16,7 @@ Resources are read-only views over runtime state. Plan resources expose summarie
 
 ## Execution Boundary
 
-Execution tools currently prepare allowlisted JMeter CLI commands and record planned runs. JTL analysis tools parse CSV result files directly. JMeter-backed validation and actual process execution remain guarded integration points for the Java bridge/runtime execution phase.
+Execution tools prepare allowlisted JMeter CLI commands and record planned runs by default. When callers pass `execute: true`, the runtime executes the allowlisted JMeter command without a shell, records stdout/stderr, updates run status, and exposes artifacts through run resources. JTL analysis tools parse CSV result files directly. JMeter-backed validation remains a guarded Java bridge integration point.
 
 ## Java Bridge Protocol
 

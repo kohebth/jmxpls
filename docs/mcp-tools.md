@@ -59,7 +59,7 @@ Examples:
 
 ## Execution and Reports
 
-- `run_jmeter` creates a planned non-GUI command record for `jmeter -n -t <planPath> -l <jtlPath>` and returns a `runId`.
+- `run_jmeter` creates a planned non-GUI command record for `jmeter -n -t <planPath> -l <jtlPath>` and returns a `runId`. Pass `execute: true` to run the allowlisted command without a shell and record stdout, stderr, exit code, status, and artifacts.
 - `get_run_status`, `get_run_logs`, `export_run_artifacts`, and `stop_run` operate on in-memory run records.
 - `generate_html_report` creates a planned report command for `jmeter -g <jtlPath> -o <outputDir>`.
 - `analyze_jtl`, `compare_jtl`, and `check_sla` parse JTL CSV output and return metrics including errors, throughput, percentiles, response codes, and per-label summaries.
